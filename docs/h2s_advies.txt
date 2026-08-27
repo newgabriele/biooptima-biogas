@@ -1,0 +1,10 @@
+PROCEDURE BIJ HOOG H2S GEHALTE (WATERSTOFSULFIDE):
+
+- Bij H2S waarden tussen 200 en 500 ppm:
+  Verhoog geleidelijk de lucht/zuurstof dosering of controleer de ijzerhydroxide/ijzerchloride dosering. Controleer of de mengers in de vergister goed draaien.
+
+- Bij H2S waarden boven 500 ppm (KRITISCH):
+  Acute actie vereist. Inspecteer direct het ontzwavelingssysteem. Controleer de gaswasinrichting en controleer op eventuele opstoppingen in de toevoer. Neem contact op met de procesoperator.
+
+- Mogelijke oorzaak van plotselinge H2S stijging:
+  Verandering in substraatsamenstelling (bijv. eiwitrijk of sulfaatrijk materiaal ingevoerd).

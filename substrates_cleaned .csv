@@ -1,0 +1,69 @@
+substrate_en,substrate_de,substrate_fr,substrate_nl,substrate_it,ts_pct,vs_pct_of_ts,n_tot_g_kg_ds,s_tot_g_kg_ds,s_tot_g_kg_fresh,spec_gas_yield_nm3_t
+Dairy cows,Milchkühe ( 7000 l),Lisier de vaches laitières,Melkkoeien drijfmest,Vacche da latte ,9.5,79.0,50,4.5,0.427,23.0
+Beef Cattle 4 - 27 Month,Färsen 4 - 27 Monate,Lisier génisses (4-27 mois),Jongvee mest (4-27 mnd),Manze:,10.0,67.0,50,4.5,0.45,24.0
+Beef Cattle 4 - 20 Month,Mastrinder 4 - 20 Monate ,Lisier taurillons (4-20 mois),Vleesvee mest (4-20 mnd),Vitelloni da ingrasso:,10.0,67.0,50,4.5,0.45,24.0
+Calves dung,Kälbergülle,Lisier de veaux,Kalvergier / mest,Vitelli carne bianca:,3.5,70.0,50,3.5,0.123,9.0
+pigs,Mastschweine,Lisier de porcs à l’engrais,Varkensdrijfmest,Suini da ingrasso:,4.0,72.2,80,7.0,0.28,13.0
+Young pigs,Systemferkel,Lisier de porcelets,Biggenmest,Suini lattonzoli:,4.0,72.2,120,7.5,0.3,13.0
+Sow with young pigs 8 kg,Sauen mit Ferkel 8 kg,Lisier truies (porcelets 8 kg),Zeugenmest (met biggen 8 kg),Scrofe con lattonzoli 8 kg,4.0,80.0,120,7.5,0.3,13.0
+Sow with young pigs 28 kg,Sauen mit Ferkel 28 kg,Lisier truies (porcelets 28 kg),Zeugenmest (met biggen 28 kg),Scrofe con maialini  28 kg,4.0,72.2,120,7.5,0.3,13.0
+Young sow,Jungsauen,Lisier jeunes truies,Gepigmenteerde zeugen,Scorfe da ingravidare,4.0,72.2,80,7.0,0.28,13.0
+Broiler droppings,Hähnchenmist,Fientes de poulets de chair,Vleeskuikenmest (droog),Polli,75.3,70.0,40,6.0,4.518,185.0
+Dry droppings,Trockenkot,Fientes sèches de pondeuses,Leghennenmest (droog),Ovaiole,42.0,78.0,50,6.5,2.73,161.0
+Turkey dung,Geflügelmist Pute,Fumier / fientes de dinde,Kalkoenenmest,Tacchini,55.5,67.0,40,6.5,3.608,142.0
+Horse dung,Pferdemist,Fumier de cheval,Paardenmest,Equini,30.0,67.0,20,3.0,0.9,0.0
+Strow dung Cattle,Tretmist Mastbullen,Fumier de bovins pailleux,Rundveemest met stro,Letame c/paglia,20.1,67.0,25,3.5,0.704,42.0
+Grass silage,Grassilage,Ensilage d’herbe,Graskuil,Insilato di Loietto,28.0,85.0,50,2.5,0.7,140.0
+Maize silage,Maissilage,Ensilage de maïs,Maïskuil,Insilato di Mais,30.0,98.0,14,1.2,0.36,210.0
+Maize powder,Maismehl,Farine de maïs,Maïsmeel,Farina di Mais,64.0,98.0,18,1.2,0.768,416.0
+Grain,Getreide,Céréales (orge/blé/avoine),Graan (gerst/tarwe/haver),Orzo-Frumento-Avena-Triticale (cereali),85.0,95.0,18,1.5,1.275,646.0
+Grain dust,Getreidestaub,Poussière de céréales,Graanstof,Orzo-Frumento-Avena-Triticale (cereali),85.1,92.4,24,1.8,1.532,426.0
+Grain slurry,Getreideschlempe,Drêches liquides de céréales,Graanspoeling (schlempe),Orzo-Frumento-Avena-Triticale (pastazzo),8.0,95.0,58,4.0,0.32,38.0
+green brocken rye crop (GPS),GPS ,Ensilage de céréales immatures (GPS),GPS graansilage,Insilato di cereali,35.0,85.0,15,1.8,0.63,219.0
+Green broken grain (CMS),CCM,Maïs épi broyé (CCM),CCM maïs (spil + korrel),Pannocchie c/tutolo,70.0,85.0,10,1.2,0.84,560.0
+Wheat bran,Weizenkleie,Son de blé,Tarwezemelen,fiocchi,89.0,85.0,20,2.0,1.78,444.0
+Wheat pulp,Weizenpülpe,Pulpe de blé,Tarwepulp,polpa di grano,8.6,85.0,40,3.5,0.301,62.0
+Wheat slurry,Weizenschlempe,Drêches de blé liquides,Tarweschlempe,pastazzo di grano,8.5,93.0,40,4.0,0.34,41.0
+Wheat straw,Weizenstroh,Paille de blé,Tarwestro,Paglia,91.7,85.0,5,1.0,0.917,103.0
+spring onion,Lauchzwiebeln,Cébettes / déchets d’oignon,Lente-ui / uienafval,Cipolla,6.6,85.0,40,6.0,0.396,29.0
+Beetroop / Beet cuttings,Rübenspitzen,Pointes et collets de betteraves,Bietenpunten / suikerbietenresten,Culetti di barbabietola,18.0,95.0,18,1.8,0.324,135.0
+Broccoli,Brokkoli,Déchets de brocoli,Broccoli afval,Broccoli,8.3,85.0,40,8.0,0.664,48.0
+Potato,Kartoffeln,Pommes de terre,Aardappelen,Patate,11.8,90.0,15,1.5,0.177,99.0
+Head of lettuce,Salatköpfe,Déchets de salade,Sla-afval,Scarto di Insalata,3.2,85.0,40,3.0,0.096,12.0
+Milk,Milch,Lait résiduaire,Melk (reststroom),Latte,13.2,95.0,5,3.5,0.462,100.0
+Spend grains (Brewery),Biertreber,Drêches de brasserie,Biertraber (brouwerij),Trebbie di Birra,21.3,85.0,45,3.5,0.745,133.0
+Fruit pomace,Obsttrester,Marc de fruits,Fruittresters / pulp,Obsttrester,3.2,93.0,11,1.0,0.032,9.0
+Rapesseed oil / Cake,Rapsöl/Kuchen,Tourteau de colza,Koolzaadkoek / schilfers,Sansa di Colza,25.0,85.0,50,7.0,1.75,158.0
+Fat decantation,Fettabscheider,Graisses de bac à graisse,Vetafscheider vet,Grassi di risulta gastronomica,40.0,95.0,15,1.5,0.6,320.0
+Deep-fry-fat,Frittierfett ,Huile de friture usagée,Frituurvet,Olio di friggitrice,55.0,98.0,9,0.5,0.275,275.0
+Vegetable fat,Pflanz. Fette,Graisses végétales,Plantaardig vet,grassi vegetali,25.0,85.0,9,0.5,0.125,138.0
+Fatty acid from Biodiesel,Fettsäure aus Biodiesel,Acides gras de biodiesel,Vetzuren uit biodiesel,acidi grassi da biodisel,85.0,95.0,6,1.0,0.85,349.0
+Fat soap,Fettseifen,Savons gras,Vetzeep,saponi grassi,35.0,98.0,6,1.0,0.35,210.0
+Flotate fet,Flotatfette ,Graisses de flottation d’abattoir,Slachthuis flotatievet,Grassi di risulta da macellazione,15.0,98.0,60,4.0,0.6,90.0
+Flotate sludge Potato residuum,Flotatschlamm Kartoffelschlempe,Boues de flottation de pomme de terre,Aardappelslib (flotatie),Fanghi di pastazzo di patate,15.0,90.0,90,3.0,0.45,93.0
+Potato cuttings,Kartoffelschnitzel,Épluchures de pommes de terre,Aardappelschillen,Buccette di patate,17.0,90.0,15,1.5,0.255,82.0
+Potato pulp,Kartoffelpülpe,Pulpe de pomme de terre,Aardappelpulp,polpa di patate,15.0,90.0,8,1.5,0.225,116.0
+Glycerin,Glycerin,Glycérine,Glycerine (biodiesel),Glicerina da lavorazione di Biodiesel,98.0,95.0,0,0.2,0.196,686.0
+Biomix,Biomix,Biomix,Biomix mengsel,Biomix,20.0,94.2,5,2.0,0.4,150.0
+Methanol,Methanol,Méthanol,Methanol,Metanolo,87.0,100.0,0,0.0,0.0,783.0
+Molasse fluids,Melasse,Mélasse liquide,Melasse vloeibaar,Melassa,50.0,98.0,1,6.0,3.0,325.0
+Cutting water Flotating Scum,Schälwasser Flotat,Flottat d’eaux de lavage,Schilwater schuim/slib,Fango d'acque di sbucciatura,5.1,88.0,10,2.5,0.128,27.0
+Fruit juice concentrate,Fruchtsaftkonzentrat,Concentré de jus de fruits,Vruchtensapconcentraat,Concentrato di succhi da frutta,40.0,89.0,10,1.0,0.4,306.0
+Waste starch (Potato),Abfallstärke,Amidon résiduaire,Aardappelzetmeel afval,Amidi (patate),48.0,85.0,5,0.8,0.384,263.0
+Apple pomace,Apfeltrester,Marc de pomme,Appeltrester,Marcomele-Buccette seccate,11.6,90.0,10,1.0,0.116,76.0
+scarti dell'industria di patate,Siebabfall Kartoffelindustrie,Déchets industriels de pomme de terre,Aardappelindustrie reststroom,scarti dell'industria di patate,32.0,85.0,15,1.5,0.48,180.0
+Natural furtiliezer,Naturdünger,Engrais organique,Organische meststof,fertilizzanti naturali,91.5,70.0,50,4.0,3.66,202.0
+Primary Sludge Cutting Pulp,Primärschlamm Schälerschlempe,Boues primaires d’épluchage,Primair schilsllib,fango di prima sbucciatura,3.6,87.0,90,3.0,0.108,20.0
+Potato protein Liquid (PPL),PPL,Protéines liquides de pomme de terre (PPL),Aardappeleiwit vloeibaar (PPL),PPL,60.0,85.0,50,12.0,7.2,251.0
+Food waste,Speiseabfälle,Déchets alimentaires,Voedselresten / swill,Rifiuti alimentari,21.0,85.0,35,3.5,0.735,105.0
+Soup waste,Suppenabfälle,Déchets de soupes et sauces,Soep- en keukenafval,scarti di minestre,20.0,85.0,30,3.5,0.7,97.0
+Slaughterhous waste,Schlachtabfälle,Déchets d’abattoir,Slachtafval,scarti da macello,20.0,98.0,120,10.0,2.0,160.0
+Pig blood,Schweineblut,Sang de porc,Varkensbloed,Sangue suino,20.0,98.0,148,12.0,2.4,160.0
+Cow blood,Rinderblut,Sang de bovin,Runderbloed,Sangue Bovino,20.0,98.0,142,12.0,2.4,160.0
+Intestinal waste,Darmschleim,Contenu et mucus intestinal,Darminhoud / darmslijm,Budelle,18.4,95.0,100,8.0,1.472,83.0
+Cow stmarch content,Panseninhalt,Contenu de panse bovine,Pensinhoud runderen,trippe piene,15.0,95.0,17,3.5,0.525,60.0
+Stomarch content,Mageninhalt,Contenus stomacaux,Maaginhoud,Rumine di bovini,13.0,98.0,26,3.5,0.455,42.0
+Sewage sludge,Klärschlamm,Boues d’épuration urbaines,Rioolwaterzuiveringsslib,fanghi di depurazione,5.0,72.2,55,14.0,0.7,16.0
+Sludge liquid manure tank,Rechengut Grubenreste,Dépôts de fosse à lisier,Bezinksel mestopslag,resti di vasche liquame,6.2,90.0,40,6.0,0.372,12.0
+Muddy water recirculate,Trübwasser Gärreste (Rezitechnik),Centrat / eau de recirculation,Recirculatiewater vergister,Liquido proveniente da Fermentazione,6.0,65.0,0,2.0,0.12,9.0
+Water,Wasser,Eau,Water,Acqua,0.0,0.0,0,0.0,0.0,

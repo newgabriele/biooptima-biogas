@@ -1,0 +1,56 @@
+2026-08-26 18:13:34.165 Uvicorn server started on :::8502
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8502
+  Network URL: http://192.168.1.116:8502
+  External URL: http://95.74.168.109:8502
+
+2026-08-26 18:14:48.686 Script compilation error
+Traceback (most recent call last):
+  File "C:\BiogasApp\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 669, in _run_script
+    code = self._script_cache.get_bytecode(script_path)
+  File "C:\BiogasApp\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_cache.py", line 72, in get_bytecode
+    filebody = magic.add_magic(filebody, script_path)
+  File "C:\BiogasApp\venv\Lib\site-packages\streamlit\runtime\scriptrunner\magic.py", line 45, in add_magic
+    tree = ast.parse(code, script_path, "exec")
+  File "C:\Users\Gebruiker\AppData\Local\Python\pythoncore-3.14-64\Lib\ast.py", line 46, in parse
+    return compile(source, filename, mode, flags,
+                   _feature_version=feature_version, optimize=optimize)
+  File "C:\BiogasApp\app.py", line 117
+    "Viscositeit (% max)": [68%, 70%, 67%, 72%, 69%, 66%, 68%, 71%, 69%],
+                               ^
+SyntaxError: invalid syntax
+2026-08-26 18:14:48.699 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-08-26 18:15:41.837 Script compilation error
+Traceback (most recent call last):
+  File "C:\BiogasApp\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 669, in _run_script
+    code = self._script_cache.get_bytecode(script_path)
+  File "C:\BiogasApp\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_cache.py", line 72, in get_bytecode
+    filebody = magic.add_magic(filebody, script_path)
+  File "C:\BiogasApp\venv\Lib\site-packages\streamlit\runtime\scriptrunner\magic.py", line 45, in add_magic
+    tree = ast.parse(code, script_path, "exec")
+  File "C:\Users\Gebruiker\AppData\Local\Python\pythoncore-3.14-64\Lib\ast.py", line 46, in parse
+    return compile(source, filename, mode, flags,
+                   _feature_version=feature_version, optimize=optimize)
+  File "C:\BiogasApp\app.py", line 117
+    "Viscositeit (% max)": [68%, 70%, 67%, 72%, 69%, 66%, 68%, 71%, 69%],
+                               ^
+SyntaxError: invalid syntax
+2026-08-26 18:15:41.840 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-08-26 18:24:02.601 Script compilation error
+Traceback (most recent call last):
+  File "C:\BiogasApp\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 669, in _run_script
+    code = self._script_cache.get_bytecode(script_path)
+  File "C:\BiogasApp\venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_cache.py", line 72, in get_bytecode
+    filebody = magic.add_magic(filebody, script_path)
+  File "C:\BiogasApp\venv\Lib\site-packages\streamlit\runtime\scriptrunner\magic.py", line 45, in add_magic
+    tree = ast.parse(code, script_path, "exec")
+  File "C:\Users\Gebruiker\AppData\Local\Python\pythoncore-3.14-64\Lib\ast.py", line 46, in parse
+    return compile(source, filename, mode, flags,
+                   _feature_version=feature_version, optimize=optimize)
+  File "C:\BiogasApp\app.py", line 61
+    st.info(\u0641"Actieve Plant: **{selected_plant}** | Taal: **{selected_lang}**")
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+SyntaxError: invalid syntax
+2026-08-26 18:24:02.606 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.

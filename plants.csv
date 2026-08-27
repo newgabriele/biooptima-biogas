@@ -1,0 +1,6 @@
+Klant,Installatienaam,Locatie,Reactor Volume (m³),Nominaal Debiet (m³/h),Status
+Sesa,Este,Este (PD),5000.0,500.0,In opstart 🟡
+Sesa,Da.Ma,Este (PD),4500.0,450.0,Actief 🟢
+Envitec,Merlara,Padova,5000.0,500.0,Gekalibreerd 🟢
+BTS,Verona Biogas,Verona,6000.0,600.0,Actief 🟢
+Bioman,Da.Ma,Vivaro,3500.0,350.0,Actief 🟢
