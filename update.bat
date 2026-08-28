@@ -5,8 +5,8 @@ echo ==========================================
 echo    BioOptima 360 - GitHub Cloud Snelkoppeling
 echo ==========================================
 echo.
-echo 1. Ophalen en samenvoegen van cloud-wijzigingen...
-git pull origin main --rebase
+echo 1. Ophalen en synchroniseren met cloud...
+git pull origin main --rebase --allow-unrelated-histories
 
 echo.
 echo 2. Lokale bestanden toevoegen...
