@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 from tabs.tab2_kantoor import render_tab2
 from tabs.tab7_installaties import render_tab7
+from tabs import tab12_master
 
 st.set_page_config(
     page_title="BioOptima 360° — Biogas Process Optimization",
@@ -22,6 +23,7 @@ translations = {
         "tab1": "📊 Tab 1: Dashboard & Overzicht",
         "tab2": "🎛️ Tab 2: Kantoor & Receptbeheer",
         "tab7": "🏭 Tab 7: Installaties Beheer",
+        "tab12": "🧠 Master Dashboard & AI Register",
         "dash_title": "Dashboard & Monitoring",
         "dash_info": "Overzicht van de actieve reactorparameters, biologische belasting en gasproductie.",
         "vol_metric": "Reactor Volume",
@@ -42,6 +44,7 @@ translations = {
         "tab1": "📊 Tab 1: Dashboard & Panoramica",
         "tab2": "🎛️ Tab 2: Ufficio & Gestione Ricette",
         "tab7": "🏭 Tab 7: Gestione Impianti",
+        "tab12": "🧠 Master Dashboard & Registro AI",
         "dash_title": "Dashboard & Monitoraggio",
         "dash_info": "Panoramica dei parametri attivi del reattore, carico biologico e produzione di gas.",
         "vol_metric": "Volume Reattore",
@@ -62,6 +65,7 @@ translations = {
         "tab1": "📊 Tab 1: Dashboard & Overview",
         "tab2": "🎛️ Tab 2: Office & Recipe Management",
         "tab7": "🏭 Tab 7: Installations Management",
+        "tab12": "🧠 Master Dashboard & AI Register",
         "dash_title": "Dashboard & Monitoring",
         "dash_info": "Overview of active reactor parameters, organic loading rate, and gas production.",
         "vol_metric": "Reactor Volume",
@@ -157,17 +161,25 @@ if selected_plant not in st.session_state.system_status_store:
         "Status": ["Optimaal", "Actief", "Optimaal", "Stabiel", "Normaal", "Doelbereik"]
     })
 
-tab1, tab2, tab7 = st.tabs([
-    t["tab1"], 
-    t["tab2"],
-    t["tab7"]
-])
+# Dynamisch tabbladen toewijzen op basis van Administrator-rol
+if is_admin:
+    tab1, tab2, tab7, tab12 = st.tabs([
+        t["tab1"], 
+        t["tab2"],
+        t["tab7"],
+        t["tab12"]
+    ])
+else:
+    tab1, tab2, tab7 = st.tabs([
+        t["tab1"], 
+        t["tab2"],
+        t["tab7"]
+    ])
 
 with tab1:
     st.markdown(f"### 📊 {t['dash_title']} — {selected_plant}")
     st.info(f"💡 {t['dash_info']}")
     
-    # Bereken HRT direct op basis van actieve invoer in session_state indien aanwezig
     def_sub_tons = {"Maissilage": 25.0, "Drijfmest (rund)": 120.0, "Kippenmest": 10.0, "Glycerine": 2.0}
     total_sub_calc = sum(st.session_state.get(f"input_ton_{sub}", val) for sub, val in def_sub_tons.items())
     current_hrt_calc = reactor_vol / total_sub_calc if total_sub_calc > 0 else 0.0
@@ -196,3 +208,7 @@ with tab2:
 
 with tab7:
     render_tab7(selected_lang, is_admin)
+
+if is_admin:
+    with tab12:
+        tab12_master.render()

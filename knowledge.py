@@ -1,9 +1,87 @@
-# knowledge.py - Kennisbank & Live Gemini AI Integratie
+# knowledge.py - Kennisbank, Live Gemini AI Integratie & Centrale Expert Regels
 import os
 from google import genai
 from pypdf import PdfReader
 
 DOCS_DIR = "docs"
+
+# ==========================================
+# CENTRAAL REGISTER VAN INTELLIGENTE REKENVRAGEN & TABS
+# ==========================================
+INTELLIGENTE_REKENVRAGEN = {
+    "h2s_ijzer_dosering": {
+        "titel": "H₂S Reductie & IJzeroxide Dosering",
+        "doel": "Optimalisatie van H₂S-verwijdering in gashouder of reactor",
+        "standaard_context": "Biogasflow van 500 m³/h, gebruikmakend van een 35% Fe2O3 en 35% FeO mix.",
+        "vraag_template": (
+            "Bereken de benodigde dosering van de Fe2O3/FeO mix (elk 35%) "
+            "bij een gasproductie van {biogas_flow} m³/h om de H2S-concentratie "
+            "terug te brengen van {h2s_ingang} ppm naar beneden de {h2s_doel} ppm."
+        ),
+        "relevante_formules": ["bereken_ijzer_dosering", "chemische_binding_h2s"],
+        "gebruikte_in_tabs": ["tab3_operator.py", "tab7_installaties.py"]
+    },
+    "thermofiele_hrt_stabiliteit": {
+        "titel": "Thermofiele HRT en CSTR Belasting",
+        "doel": "Bewaking hydraulische verblijftijd en verzuringspreventie",
+        "standaard_context": "Continue geroerde tankreactor (CSTR) onder thermofiele condities.",
+        "vraag_template": (
+            "Beoordeel of een HRT van {hrt_dagen} dagen veilig is voor een thermofiele "
+            "CSTR bij een organische belasting van {olr} kg COD/m³·dag, rekening houdend "
+            "met de recirculatiefactor."
+        ),
+        "relevante_formules": ["bereken_hrt", "recirculatie_factor_check"],
+        "gebruikte_in_tabs": ["tab2_kantoor.py", "tab7_installaties.py"]
+    },
+    "recirculatie_effluent": {
+        "titel": "Effluent Recirculatie & Bufferwerking",
+        "doel": "Berekening van recirculatiefactor voor VFA/TIC stabilisatie",
+        "standaard_context": "BioOptima 360° processturing en vloeistofbalans.",
+        "vraag_template": (
+            "Wat is het effect op de alkaliniteit (TIC) en VFA/TIC-ratio als we "
+            "{recirculatie_percentage}% van het gescheiden effluent terugvoeren "
+            "naar de hydrolysetank?"
+        ),
+        "relevante_formules": ["bereken_recirculatie", "vfa_tic_balans"],
+        "gebruikte_in_tabs": ["tab3_operator.py", "tab2_kantoor.py"]
+    }
+}
+
+# ==========================================
+# PRAKTIJKBENCHMARKS & REFERENTIECASES
+# ==========================================
+PRAKTIJK_BENCHMARKS = {
+    "merlara_envitec": {
+        "naam": "EnviTec - Merlara",
+        "substraat_profiel": ["100% Mais", "Recirculaat"],
+        "dosering_strategie": "20 kg ijzeroxide (1 zak, ochtenddoseerschema)",
+        "dosering_locatie": "Begin van de ontvangstput",
+        "transtijd": "Ca. 1 uur tot opname in het actieve systeem",
+        "resultaat_observatie": "H2S stabiel rond 150 ppm",
+        "doel": "Validatie van H2S-binding bij monovergisting/maissubstraat"
+    }
+}
+
+
+def krijg_alle_rekenvragen():
+    return INTELLIGENTE_REKENVRAGEN
+
+
+def krijg_praktijk_benchmarks():
+    return PRAKTIJK_BENCHMARKS
+
+
+def registreer_praktijk_case(sleutel, naam, substraat_profiel, dosering_strategie, dosering_locatie, transtijd, resultaat_observatie, doel):
+    """Registreert een nieuwe praktijkcase direct in het geheugenregister."""
+    PRAKTIJK_BENCHMARKS[sleutel] = {
+        "naam": naam,
+        "substraat_profiel": substraat_profiel,
+        "dosering_strategie": dosering_strategie,
+        "dosering_locatie": dosering_locatie,
+        "transtijd": transtijd,
+        "resultaat_observatie": resultaat_observatie,
+        "doel": doel
+    }
 
 
 def haal_relevante_fragmenten_uit(tekst, zoekterm, max_fragmenten=3):
