@@ -2,22 +2,23 @@
 cd /d C:\BiogasApp
 cls
 echo ==========================================
-echo    BioOptima 360° - GitHub Cloud Snelkoppeling
+echo    BioOptima 360 - GitHub Cloud Snelkoppeling
 echo ==========================================
 echo.
-git status
+echo 1. Ophalen en samenvoegen van cloud-wijzigingen...
+git pull origin main --rebase
+
+echo.
+echo 2. Lokale bestanden toevoegen...
+git add .
+
 echo.
 set /p commit_msg="Typ een korte omschrijving van je wijzigingen: "
-
-if "%commit_msg%"=="" set commit_msg="Snelle update via batch script"
+if "%commit_msg%"=="" set commit_msg="Update via batch script"
 
 echo.
-echo Bezig met toevoegen en vastleggen...
-git add .
+echo 3. Vastleggen en uploaden naar GitHub...
 git commit -m "%commit_msg%"
-
-echo.
-echo Bezig met uploaden naar GitHub (cloud)...
 git push origin main
 
 echo.
