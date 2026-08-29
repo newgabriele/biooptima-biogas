@@ -1,214 +1,161 @@
-# app.py
 import streamlit as st
-import pandas as pd
-from tabs.tab2_kantoor import render_tab2
-from tabs.tab7_installaties import render_tab7
-from tabs import tab12_master
+import os
+import sys
 
-st.set_page_config(
-    page_title="BioOptima 360° — Biogas Process Optimization",
-    page_icon="⚡",
-    layout="wide"
-)
+# Zorg ervoor dat Python de map correct herkent
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-translations = {
-    "Nederlands": {
-        "sidebar_settings": "⚙️ Instellingen & Installatie",
-        "lang_label": "Taal / Language",
-        "role_label": "Rol / Modus",
-        "client_label": "Klant",
-        "plant_label": "Installatie / Plant",
-        "vol_label": "Reactor Volume (m³)",
-        "strip_label": "Gas Stripping Factor",
-        "tab1": "📊 Tab 1: Dashboard & Overzicht",
-        "tab2": "🎛️ Tab 2: Kantoor & Receptbeheer",
-        "tab7": "🏭 Tab 7: Installaties Beheer",
-        "tab12": "🧠 Master Dashboard & AI Register",
-        "dash_title": "Dashboard & Monitoring",
-        "dash_info": "Overzicht van de actieve reactorparameters, biologische belasting en gasproductie.",
-        "vol_metric": "Reactor Volume",
-        "biogas_target": "Doel Biogas",
-        "h2s_target": "Doel H2S",
-        "status_title": "Systeemstatus & Basisparameters (Bewerkbaar)",
-        "admin_badge": "🛠️ Administrator Modus: Volledig beheer, R&D testing en master code-generatie actief (alle installaties zichtbaar).",
-        "client_badge": "👤 Klant / Gebruiker Modus: Alleen data-invoer en inzicht in globale kennis voor uw installaties."
-    },
-    "Italiano": {
-        "sidebar_settings": "⚙️ Impostazioni & Impianto",
-        "lang_label": "Lingua / Language",
-        "role_label": "Ruolo / Modalità",
-        "client_label": "Cliente",
-        "plant_label": "Impianto / Unità",
-        "vol_label": "Volume Reattore (m³)",
-        "strip_label": "Fattore di Stripping Gas",
-        "tab1": "📊 Tab 1: Dashboard & Panoramica",
-        "tab2": "🎛️ Tab 2: Ufficio & Gestione Ricette",
-        "tab7": "🏭 Tab 7: Gestione Impianti",
-        "tab12": "🧠 Master Dashboard & Registro AI",
-        "dash_title": "Dashboard & Monitoraggio",
-        "dash_info": "Panoramica dei parametri attivi del reattore, carico biologico e produzione di gas.",
-        "vol_metric": "Volume Reattore",
-        "biogas_target": "Target Biogas",
-        "h2s_target": "Target H2S",
-        "status_title": "Stato del Sistema & Parametri Base (Modificabile)",
-        "admin_badge": "🛠️ Modalità Administrator: Gestione completa, test R&D e generazione codici master attivi (tutti gli impianti visibili).",
-        "client_badge": "👤 Modalità Cliente / Utente: Solo inserimento dati e visualizzazione conoscenza globale per i vostri impianti."
-    },
-    "English": {
-        "sidebar_settings": "⚙️ Settings & Plant Setup",
-        "lang_label": "Language",
-        "role_label": "Role / Mode",
-        "client_label": "Customer",
-        "plant_label": "Reactor Unit",
-        "vol_label": "Reactor Volume (m³)",
-        "strip_label": "Gas Stripping Factor",
-        "tab1": "📊 Tab 1: Dashboard & Overview",
-        "tab2": "🎛️ Tab 2: Office & Recipe Management",
-        "tab7": "🏭 Tab 7: Installations Management",
-        "tab12": "🧠 Master Dashboard & AI Register",
-        "dash_title": "Dashboard & Monitoring",
-        "dash_info": "Overview of active reactor parameters, organic loading rate, and gas production.",
-        "vol_metric": "Reactor Volume",
-        "biogas_target": "Biogas Target",
-        "h2s_target": "H2S Target",
-        "status_title": "System Status & Baseline Parameters (Editable)",
-        "admin_badge": "🛠️ Administrator Mode: Full management, R&D testing and master code generation active (all installations visible).",
-        "client_badge": "👤 Customer / User Mode: Data input and global knowledge overview for your installations."
-    }
-}
+# Expliciete en veilige imports van alle tabbladen (1 t/m 12)
+try:
+    from tabs import tab1_plant_config as t1
+except ImportError:
+    t1 = None
 
-selected_lang = st.sidebar.selectbox("Taal / Language", ["Nederlands", "Italiano", "English"])
-t = translations[selected_lang]
+try:
+    from tabs import tab2_kinetics as t2
+except ImportError:
+    t2 = None
 
-st.sidebar.markdown(f"## {t['sidebar_settings']}")
+try:
+    from tabs import tab3_operator as t3
+except ImportError:
+    t3 = None
 
-role_options = ["Administrator (Beheer & Test)", "Klant / Gebruiker (Data & Kennis)"]
-selected_role = st.sidebar.selectbox(t["role_label"], role_options)
-is_admin = ("Administrator" in selected_role)
+try:
+    from tabs import tab4_management as t4
+except ImportError:
+    t4 = None
 
-if "installations_df" not in st.session_state:
-    st.session_state.installations_df = pd.DataFrame([
-        {"Klant": "Bioman Srl", "Installatie / Plant": "CSTR Digester 1", "Volume (m³)": 4500.0, "Status": "Actief"},
-        {"Klant": "Bioman Srl", "Installatie / Plant": "Thermophilic Reactor 2", "Volume (m³)": 3200.0, "Status": "Actief"},
-        {"Klant": "BioPower Teglio", "Installatie / Plant": "Teglio Plant Central", "Volume (m³)": 2800.0, "Status": "Actief"},
-        {"Klant": "AgroEnergy BV", "Installatie / Plant": "Almere Digester North", "Volume (m³)": 5000.0, "Status": "Planning"},
-        {"Klant": "AgroEnergy BV", "Installatie / Plant": "Almere Digester South", "Volume (m³)": 4500.0, "Status": "Planning"}
-    ])
-else:
-    df_check = st.session_state.installations_df
-    if "Klant" not in df_check.columns:
-        if "Klant / Gebruiker" in df_check.columns:
-            df_check["Klant"] = df_check["Klant / Gebruiker"]
-        elif "Moederklant" in df_check.columns:
-            df_check["Klant"] = df_check["Moederklant"]
-        else:
-            st.session_state.installations_df = pd.DataFrame([
-                {"Klant": "Bioman Srl", "Installatie / Plant": "CSTR Digester 1", "Volume (m³)": 4500.0, "Status": "Actief"},
-                {"Klant": "Bioman Srl", "Installatie / Plant": "Thermophilic Reactor 2", "Volume (m³)": 3200.0, "Status": "Actief"},
-                {"Klant": "BioPower Teglio", "Installatie / Plant": "Teglio Plant Central", "Volume (m³)": 2800.0, "Status": "Actief"},
-                {"Klant": "AgroEnergy BV", "Installatie / Plant": "Almere Digester North", "Volume (m³)": 5000.0, "Status": "Planning"},
-                {"Klant": "AgroEnergy BV", "Installatie / Plant": "Almere Digester South", "Volume (m³)": 4500.0, "Status": "Planning"}
-            ])
+try:
+    from tabs import tab5_analytics as t5
+except ImportError:
+    t5 = None
 
-if is_admin:
-    filtered_df = st.session_state.installations_df
-else:
-    filtered_df = st.session_state.installations_df[st.session_state.installations_df["Klant"] == "Bioman Srl"]
+try:
+    from tabs import tab6_substrates as t6
+except ImportError:
+    t6 = None
 
-client_hierarchy = {}
-for _, row in filtered_df.iterrows():
-    customer = row.get("Klant", "Bioman Srl")
-    plant = row.get("Installatie / Plant", "Plant 1")
-    
-    if customer not in client_hierarchy:
-        client_hierarchy[customer] = []
-    if plant not in client_hierarchy[customer]:
-        client_hierarchy[customer].append(plant)
+try:
+    from tabs import tab7_installations as t7
+except ImportError:
+    t7 = None
 
-selected_customer = st.sidebar.selectbox(t["client_label"], list(client_hierarchy.keys()))
-selected_plant = st.sidebar.selectbox(t["plant_label"], client_hierarchy[selected_customer])
+try:
+    from tabs import tab8_ai_calibration as t8
+except ImportError:
+    t8 = None
 
-reactor_vol = st.sidebar.number_input(t["vol_label"], min_value=500.0, max_value=10000.0, value=4500.0, step=100.0)
-gas_stripping_factor = st.sidebar.slider(t["strip_label"], min_value=0.5, max_value=2.0, value=1.0, step=0.1)
+try:
+    from tabs import tab9_reports as t9
+except ImportError:
+    t9 = None
 
-st.sidebar.markdown("---")
-temp_regime = st.sidebar.radio("🌡️ Temperatuurregime (T)", ["Mesofiel (~38°C)", "Thermofiel (~52°C)"])
+try:
+    from tabs import tab10_changelog as t10
+except ImportError:
+    t10 = None
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("**BioOptima 360° v2.4**\n*Direct Interspecies Electron Transfer (DIET) & Micro-dosing*")
+try:
+    from tabs import tab11_benchmark as t11
+except ImportError:
+    t11 = None
 
-st.markdown(f"# 🔋 BioOptima 360° — {selected_customer} ({selected_plant})")
+try:
+    from tabs import tab12_questions as t12
+except ImportError:
+    t12 = None
 
-if is_admin:
-    st.success(t["admin_badge"])
-else:
-    st.info(t["client_badge"])
 
-if "system_status_store" not in st.session_state:
-    st.session_state.system_status_store = {}
-
-if selected_plant not in st.session_state.system_status_store:
-    if "Thermofiel" in temp_regime:
-        t_w = "52.2 °C (Thermofiel)"
-        ph_w = "8.0 (NH3 balans)"
-    else:
-        t_w = "38.5 °C (Mesofiel)"
-        ph_w = "7.8 (Optimaal)"
-
-    st.session_state.system_status_store[selected_plant] = pd.DataFrame({
-        "Parameter": ["Reactortemperatuur", "Procesregime", "pH Waarde", "VFA / TAC Ratio", "Ammonium (NH4+)", "H2S Gasfase"],
-        "Waarde": [t_w, temp_regime, ph_w, "0.22", "2450 mg/L", "81 ppm"],
-        "Status": ["Optimaal", "Actief", "Optimaal", "Stabiel", "Normaal", "Doelbereik"]
-    })
-
-# Dynamisch tabbladen toewijzen op basis van Administrator-rol
-if is_admin:
-    tab1, tab2, tab7, tab12 = st.tabs([
-        t["tab1"], 
-        t["tab2"],
-        t["tab7"],
-        t["tab12"]
-    ])
-else:
-    tab1, tab2, tab7 = st.tabs([
-        t["tab1"], 
-        t["tab2"],
-        t["tab7"]
-    ])
-
-with tab1:
-    st.markdown(f"### 📊 {t['dash_title']} — {selected_plant}")
-    st.info(f"💡 {t['dash_info']}")
-    
-    def_sub_tons = {"Maissilage": 25.0, "Drijfmest (rund)": 120.0, "Kippenmest": 10.0, "Glycerine": 2.0}
-    total_sub_calc = sum(st.session_state.get(f"input_ton_{sub}", val) for sub, val in def_sub_tons.items())
-    current_hrt_calc = reactor_vol / total_sub_calc if total_sub_calc > 0 else 0.0
-
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric(t["vol_metric"], f"{reactor_vol:,.0f} m³")
-    col2.metric("Tijdsregime (HRT)", f"{current_hrt_calc:.1f} dagen")
-    col3.metric("Regime (T)", temp_regime)
-    col4.metric(t["biogas_target"], "500.0 m³/h")
-    col5.metric(t["h2s_target"], "80 ppm")
-
-    st.markdown("---")
-    st.markdown(f"##### 📈 {t['status_title']}")
-    st.caption("💡 Pas hieronder direct de actuele lab- of sensorwaarden aan voor deze installatie zodat je ze morgen live kunt tonen.")
-
-    current_status_df = st.session_state.system_status_store[selected_plant]
-    edited_status_df = st.data_editor(
-        current_status_df,
-        use_container_width=True,
-        key=f"status_editor_{selected_plant}"
+def main():
+    st.set_page_config(
+        page_title="BioOptima 360° | Industrial Biogas Digital Twin",
+        page_icon="♻️",
+        layout="wide"
     )
-    st.session_state.system_status_store[selected_plant] = edited_status_df
 
-with tab2:
-    render_tab2(selected_customer, selected_plant, reactor_vol, gas_stripping_factor, selected_lang, is_admin, temp_regime)
+    st.sidebar.title("🌿 BioOptima 360°")
+    st.sidebar.markdown("**Digital Twin & Dynamic Dosing**")
+    st.sidebar.markdown("---")
 
-with tab7:
-    render_tab7(selected_lang, is_admin)
+    menu_options = [
+        "🏠 Master Dashboard",
+        "👤 Klanten & Installatie Beheer",
+        "⚙️ Tab 1: Plant Configuratie",
+        "🧪 Tab 2: Kinetisch Model & Basisdoses",
+        "👷 Tab 3: Operator & 20kg Bag Dosing",
+        "📈 Tab 4: Directie & Financiële ROI",
+        "📊 Tab 5: Analytics & Wobbe-Index",
+        "🌾 Tab 6: Substraten & Marktprijzen",
+        "🏭 Tab 7: Installaties & Werfbeheer",
+        "🔬 Tab 8: AI-kalibratie & Sensor Validatie",
+        "📋 Tab 9: Rapportage & Logs",
+        "📋 Tab 10: Systeem Changelog & Release",
+        "⚙️ Tab 11: Benchmark & Valorisatie",
+        "💡 Tab 12: Intelligente Vragen & Registratie"
+    ]
 
-if is_admin:
-    with tab12:
-        tab12_master.render()
+    choice = st.sidebar.radio("Navigatie", menu_options)
+
+    # Dynamische weergave van de actieve werf uit Tab 7
+    current_plant = st.session_state.get('active_plant', 'Corte Pila (Italië) - 1MW CSTR')
+
+    st.sidebar.markdown("---")
+    st.sidebar.info(
+        f"🏭 **Actieve Werf:**\n{current_plant}\n\n"
+        "⚙️ **Plant Status:** Actief\n"
+        "🔹 **Additief:** Fe₂O₃/FeO (35%/35%)\n"
+        "🔹 **Versie:** v2.0.0 (Augustus 2026)"
+    )
+
+    # Routering op basis van menukeuze
+    if choice == "🏠 Master Dashboard":
+        st.title("🏠 BioOptima 360° — Master Dashboard")
+        st.markdown("Centraal besturingsplatform voor industriële anaerobe vergisting en biomethaan optimalisatie.")
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric(label="Actief Biogas Debiet", value="500 m³/h", delta="+5.6% TalTech Yield")
+        with col2:
+            st.metric(label="H₂S Vloeistoffase Doel", value="< 100 ppm", delta="-85% Ontzwaveling")
+        with col3:
+            st.metric(label="Prediktieve Nauwkeurigheid", value="95.4%", delta="ML Engine Active")
+
+    elif choice == "👤 Klanten & Installatie Beheer":
+        st.title("👤 Klanten & Gebruikersbeheer")
+        st.markdown("Overzicht van actieve klantdossiers, installaties en toegangsrechten.")
+
+    elif "Tab 1:" in choice:
+        render_tab(t1, "Tab 1: Plant Configuratie & Systeemparameters")
+    elif "Tab 2:" in choice:
+        render_tab(t2, "Tab 2: Kinetisch Model & Gasexpansie")
+    elif "Tab 3:" in choice:
+        render_tab(t3, "Tab 3: Operator Werkinstructies & 20kg Bag Dosing")
+    elif "Tab 4:" in choice:
+        render_tab(t4, "Tab 4: Directie & Financiële ROI")
+    elif "Tab 5:" in choice:
+        render_tab(t5, "Tab 5: Analytics, Wobbe-Index & Vochtbalans")
+    elif "Tab 6:" in choice:
+        render_tab(t6, "Tab 6: Substraten & Marktprijzen")
+    elif "Tab 7:" in choice:
+        render_tab(t7, "Tab 7: Installaties & Werfbeheer")
+    elif "Tab 8:" in choice:
+        render_tab(t8, "Tab 8: AI-kalibratie & Sensor Validatie")
+    elif "Tab 9:" in choice:
+        render_tab(t9, "Tab 9: Rapportage & Systeem Logs")
+    elif "Tab 10:" in choice:
+        render_tab(t10, "Tab 10: Systeem Changelog & Release Historie")
+    elif "Tab 11:" in choice:
+        render_tab(t11, "Tab 11: Benchmark & Valorisatie Matrix")
+    elif "Tab 12:" in choice:
+        render_tab(t12, "Tab 12: Intelligente Vragen & Registratie")
+
+def render_tab(module, title):
+    st.title(title)
+    if module is not None and hasattr(module, "render"):
+        module.render()
+    else:
+        st.error(f"⚠️ Het bijbehorende tab-bestand kon niet worden geladen of mist de `render()` functie.")
+
+if __name__ == "__main__":
+    main()
