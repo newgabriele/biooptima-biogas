@@ -1,3 +1,4 @@
+# app.py - BioOptima 360° Hoofdapplicatie (Digital Twin & Dynamic Dosing)
 import streamlit as st
 import os
 import sys
@@ -5,7 +6,7 @@ import sys
 # Zorg ervoor dat Python de map correct herkent
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Expliciete en veilige imports van alle tabbladen (1 t/m 12)
+# Expliciete en veilige imports van alle tabbladen (1 t/m 13)
 try:
     from tabs import tab1_plant_config as t1
 except ImportError:
@@ -66,6 +67,11 @@ try:
 except ImportError:
     t12 = None
 
+try:
+    from tabs import tab13_sustainability as t13
+except ImportError:
+    t13 = None
+
 
 def main():
     st.set_page_config(
@@ -73,6 +79,15 @@ def main():
         page_icon="♻️",
         layout="wide"
     )
+
+    # --- CENTRALE INITIALISATIE SESSION STATE ---
+    if "substrates_db" not in st.session_state:
+        st.session_state.substrates_db = {
+            "runderdrijfmest": {"ts_pct": 0.09, "vs_pct": 0.75, "s_g_per_kg_ts": 4.0, "biogas_m3_per_ton_odm": 350.0, "price_per_ton": -5.0, "f_fast": 0.2, "f_med": 0.5, "f_slow": 0.3, "vfa_risk": 0.5},
+            "maissilage": {"ts_pct": 0.33, "vs_pct": 0.95, "s_g_per_kg_ts": 1.5, "biogas_m3_per_ton_odm": 620.0, "price_per_ton": 48.0, "f_fast": 0.5, "f_med": 0.4, "f_slow": 0.1, "vfa_risk": 2.5},
+            "kippenmest": {"ts_pct": 0.55, "vs_pct": 0.80, "s_g_per_kg_ts": 12.0, "biogas_m3_per_ton_odm": 480.0, "price_per_ton": 12.0, "f_fast": 0.6, "f_med": 0.3, "f_slow": 0.1, "vfa_risk": 4.0},
+            "melasse": {"ts_pct": 0.75, "vs_pct": 0.98, "s_g_per_kg_ts": 0.8, "biogas_m3_per_ton_odm": 750.0, "price_per_ton": 120.0, "f_fast": 0.9, "f_med": 0.1, "f_slow": 0.0, "vfa_risk": 6.0}
+        }
 
     st.sidebar.title("🌿 BioOptima 360°")
     st.sidebar.markdown("**Digital Twin & Dynamic Dosing**")
@@ -92,7 +107,8 @@ def main():
         "📋 Tab 9: Rapportage & Logs",
         "📋 Tab 10: Systeem Changelog & Release",
         "⚙️ Tab 11: Benchmark & Valorisatie",
-        "💡 Tab 12: Intelligente Vragen & Registratie"
+        "💡 Tab 12: Intelligente Vragen & Registratie",
+        "🇪🇺 Tab 13: RED II Duurzaamheid & ESG"
     ]
 
     choice = st.sidebar.radio("Navigatie", menu_options)
@@ -105,7 +121,7 @@ def main():
         f"🏭 **Actieve Werf:**\n{current_plant}\n\n"
         "⚙️ **Plant Status:** Actief\n"
         "🔹 **Additief:** Fe₂O₃/FeO (35%/35%)\n"
-        "🔹 **Versie:** v2.0.0 (Augustus 2026)"
+        "🔹 **Versie:** v2.1.0 (Augustus 2026)"
     )
 
     # Routering op basis van menukeuze
@@ -149,6 +165,8 @@ def main():
         render_tab(t11, "Tab 11: Benchmark & Valorisatie Matrix")
     elif "Tab 12:" in choice:
         render_tab(t12, "Tab 12: Intelligente Vragen & Registratie")
+    elif "Tab 13:" in choice:
+        render_tab(t13, "Tab 13: RED II Duurzaamheid & ESG")
 
 def render_tab(module, title):
     st.title(title)

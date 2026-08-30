@@ -7,6 +7,7 @@ Wobbe-Index & PCI/PCS Thermodynamica.
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
+from scipy.optimize import linprog
 import numpy as np
 import pandas as pd
 
@@ -32,6 +33,7 @@ FE_TO_S_RATIO = M_FE / M_S  # 1.7418 kg Fe nodig per 1.0 kg S
 @dataclass
 class PlantProfile:
     name: str = "Standaard Installatie"
+    inst_type: str = "agro"  # "agro", "covergisting", "industrieel"
     volume_m3: float = 2500.0
     biogas_flow_m3_h: float = 500.0
     ph_nominal: float = 7.65
@@ -423,52 +425,51 @@ def calculate_h2s_valorisation_and_yield_gain(
     biogas_price_per_m3: float = 0.68,
     fe_price_per_kg: float = 1.20,
     safety_margin: float = 1.25,
-    diet_boost_enabled: bool = True
+    diet_boost_enabled: bool = True,
+    inst_type: str = "agro"
 ) -> Dict[str, Any]:
-    """
-    Kwantificeert de theoretische gasopbrengstverhoging en energetische/financiële
-    valorisatie als gevolg van in-situ H2S binding en DIET-stimulatie door ijzeroxiden.
-    """
     base_daily_gas_m3 = float(nominal_flow_m3_h * 24.0)
     base_annual_gas_m3 = float(base_daily_gas_m3 * 365.0)
     
-    # 1. H2S Reductie & Zwavelvracht
+    if inst_type == "agro":
+        default_diet_boost = 2.0
+        ammonia_stress_factor = 1.0
+    elif inst_type == "covergisting":
+        default_diet_boost = 3.0
+        ammonia_stress_factor = 1.2
+    elif inst_type == "industrieel":
+        default_diet_boost = 3.5
+        ammonia_stress_factor = 1.4
+    else:
+        default_diet_boost = 2.5
+        ammonia_stress_factor = 1.0
+
     h2s_reduction_pct = max(0.0, (1.0 - (target_h2s_ppm / max(1.0, raw_h2s_ppm))) * 100.0)
-    s_conv_factor = 1.33e-6  # kg S per m3 per ppm H2S
+    s_conv_factor = 1.33e-6
     s_raw_day_kg = base_daily_gas_m3 * raw_h2s_ppm * s_conv_factor
     s_target_day_kg = base_daily_gas_m3 * target_h2s_ppm * s_conv_factor
     s_removed_day_kg = max(0.0, s_raw_day_kg - s_target_day_kg)
     
-    # IJzeroxidebehoefte (Fe2O3 35% / FeO 35%)
     bag_weight_kg = 20.0
-    fe_needed_day_kg = (s_removed_day_kg * FE_TO_S_RATIO * safety_margin) / FE_PER_KG_PRODUCT
+    fe_needed_day_kg = (s_removed_day_kg * FE_TO_S_RATIO * safety_margin * ammonia_stress_factor) / FE_PER_KG_PRODUCT
     fe_bags_day = int(np.ceil(fe_needed_day_kg / bag_weight_kg))
     fe_cost_day = fe_bags_day * bag_weight_kg * fe_price_per_kg
     fe_cost_yr = fe_cost_day * 365.0
     
-    # 2. Theoretische Gasopbrengst Componenten:
-    # A. Opheffen Sulfidetoxiciteit (Inhibition relief op methanogenen)
     toxicity_relief_pct = min(5.0, max(0.5, (raw_h2s_ppm - target_h2s_ppm) / 1000.0 * 1.5))
-    
-    # B. DIET Kinetiek (Direct Interspecies Electron Transfer via halfgeleidend Fe-oxide)
-    diet_gain_pct = 3.0 if diet_boost_enabled else 0.0
-    
-    # C. Elektronenherroutering (SRB vs Methanogenese competitie)
+    diet_gain_pct = default_diet_boost if diet_boost_enabled else 0.0
     srb_redirection_pct = min(1.0, (raw_h2s_ppm - target_h2s_ppm) / 5000.0 * 1.0)
     
     total_yield_gain_pct = toxicity_relief_pct + diet_gain_pct + srb_redirection_pct
     
-    # Extra volume
     extra_daily_gas_m3 = base_daily_gas_m3 * (total_yield_gain_pct / 100.0)
     extra_annual_gas_m3 = extra_daily_gas_m3 * 365.0
     new_daily_gas_m3 = base_daily_gas_m3 + extra_daily_gas_m3
     new_flow_m3_h = new_daily_gas_m3 / 24.0
     
-    # Methaangehalte en calorische waarde (PCI)
-    ch4_gain_pct_point = 1.0 if diet_boost_enabled else 0.3
-    new_ch4_pct = min(65.0, base_ch4_pct + ch4_gain_pct_point)
+    chp_gain_point = 1.2 if inst_type in ["covergisting", "industrieel"] and diet_boost_enabled else (1.0 if diet_boost_enabled else 0.3)
+    new_ch4_pct = min(68.0, base_ch4_pct + chp_gain_point)
     
-    # 1 m3 pure CH4 = 9.94 kWh (PCI ~ 35.8 MJ/m3)
     base_kwh_per_m3 = (base_ch4_pct / 100.0) * 9.94
     new_kwh_per_m3 = (new_ch4_pct / 100.0) * 9.94
     
@@ -476,12 +477,12 @@ def calculate_h2s_valorisation_and_yield_gain(
     new_annual_kwh = new_daily_gas_m3 * 365.0 * new_kwh_per_m3
     extra_annual_kwh = max(0.0, new_annual_kwh - base_annual_kwh)
     
-    # Financiële valorisatie
     extra_revenue_volume_yr = extra_annual_gas_m3 * biogas_price_per_m3
     net_extra_cashflow_yr = extra_revenue_volume_yr - fe_cost_yr
     roi_pct = (net_extra_cashflow_yr / fe_cost_yr * 100.0) if fe_cost_yr > 0 else 0.0
 
     return {
+        "inst_type": inst_type,
         "base_flow_m3_h": round(nominal_flow_m3_h, 1),
         "new_flow_m3_h": round(new_flow_m3_h, 1),
         "base_daily_gas_m3": round(base_daily_gas_m3, 0),
@@ -520,22 +521,17 @@ def calculate_activated_carbon_benchmark(
     carbon_price_per_ton: float = 3800.0,
     replacement_service_fee: float = 1200.0
 ) -> Dict[str, Any]:
-    """
-    Kwantificeert de levensduurverlenging, adsorptiebelasting en kostenbesparing
-    van downstream actieve koolfilters door in-situ H2S ontlasting naar ~100 ppm.
-    """
     daily_gas_m3 = float(nominal_flow_m3_h * 24.0)
-    s_conv_factor = 1.33e-6  # kg S per m3 per ppm H2S
+    s_conv_factor = 1.33e-6
     
     if "KI" in carbon_type:
-        s_cap_wt_pct = 0.12  # 12% adsorptiecapaciteit
+        s_cap_wt_pct = 0.12
     elif "NaOH" in carbon_type or "KOH" in carbon_type:
-        s_cap_wt_pct = 0.08  # 8% chemisorptie
+        s_cap_wt_pct = 0.08
     else:
-        s_cap_wt_pct = 0.04  # 4% standaard kool
+        s_cap_wt_pct = 0.04
         
     bed_s_capacity_kg = float(carbon_bed_kg * s_cap_wt_pct)
-    
     s_inflow_raw_day = float(daily_gas_m3 * raw_h2s_ppm * s_conv_factor)
     s_inflow_target_day = float(daily_gas_m3 * target_h2s_ppm * s_conv_factor)
     
@@ -545,7 +541,6 @@ def calculate_activated_carbon_benchmark(
     
     changes_yr_without = 365.0 / lifespan_days_without
     changes_yr_with = 365.0 / lifespan_days_with
-    
     cost_per_change = (carbon_bed_kg / 1000.0) * carbon_price_per_ton + replacement_service_fee
     
     annual_cost_without = changes_yr_without * cost_per_change
@@ -589,11 +584,6 @@ def calculate_chp_and_filter_elimination_benchmark(
     carbon_price_per_ton: float = 3800.0,
     carbon_replacement_fee: float = 1200.0
 ) -> Dict[str, Any]:
-    """
-    Kwantificeert de levensduurverlenging van WKK-motorolie (TBN behoud) en de
-    financiële eliminatie/bypass van het actieve koolfilter bij stabiel laag H2S (<100 ppm).
-    """
-    # 1. WKK Olieverversingen
     oil_changes_raw_yr = chp_annual_operating_hours / max(100.0, oil_interval_raw_hours)
     oil_changes_treated_yr = chp_annual_operating_hours / max(100.0, oil_interval_low_h2s_hours)
     
@@ -604,11 +594,10 @@ def calculate_chp_and_filter_elimination_benchmark(
     total_chp_savings_yr = oil_cost_savings_yr + engine_maint_wear_savings_yr
     oil_interval_factor = oil_interval_low_h2s_hours / max(1.0, oil_interval_raw_hours)
     
-    # 2. Koolfilter Eliminatie of Polishing
     daily_gas_m3 = float(nominal_flow_m3_h * 24.0)
     s_conv = 1.33e-6
     s_raw_day = daily_gas_m3 * raw_h2s_ppm * s_conv
-    bed_cap_s = carbon_bed_kg * 0.12  # Uitgaande van 12% KI kool
+    bed_cap_s = carbon_bed_kg * 0.12
     cost_per_carbon_change = (carbon_bed_kg / 1000.0) * carbon_price_per_ton + carbon_replacement_fee
     
     carbon_changes_raw_yr = 365.0 / max(0.1, (bed_cap_s / max(0.001, s_raw_day)))
@@ -646,7 +635,7 @@ def calculate_chp_and_filter_elimination_benchmark(
     }
 
 # ============================================================================
-# 9. INTEGRALE BENCHMARKVERGELIJKING: VELDDATA (TAB 8/9) VS. POTENTIEEL
+# 9. INTEGRALE BENCHMARKVERGELIJKING
 # ============================================================================
 
 def calculate_field_vs_potential_benchmark(
@@ -657,17 +646,13 @@ def calculate_field_vs_potential_benchmark(
     carbon_bed_kg: float = 2000.0,
     carbon_price_per_ton: float = 3800.0
 ) -> Dict[str, Any]:
-    """
-    Vergelijkt de werkelijke lab-/veldmetingen uit Tab 8 (en evt. SCADA Tab 9) 
-    met de maximaal haalbare potentiële proces- en economische verbeteringen.
-    """
     meas_gas_m3_day = float(measured_data.get("measured_biogas_m3", plant.biogas_flow_m3_h * 24.0))
     meas_h2s_ppm = float(measured_data.get("measured_h2s_ppm", 400.0))
     meas_ch4_pct = float(measured_data.get("CH4", 53.6))
     meas_co2_pct = float(measured_data.get("CO2", 46.42))
     meas_o2_pct = float(measured_data.get("O2", 0.17))
-    meas_pci = float(measured_data.get("PCI", 14.8))  # MJ/m3
-    meas_pcs = float(measured_data.get("PCS", 21.3))  # MJ/m3
+    meas_pci = float(measured_data.get("PCI", 14.8))
+    meas_pcs = float(measured_data.get("PCS", 21.3))
     meas_flow_h = meas_gas_m3_day / 24.0
     
     val_res = calculate_h2s_valorisation_and_yield_gain(
@@ -678,7 +663,8 @@ def calculate_field_vs_potential_benchmark(
         biogas_price_per_m3=plant.biogas_price_per_m3,
         fe_price_per_kg=fe_price_per_kg,
         safety_margin=plant.safety_margin,
-        diet_boost_enabled=True
+        diet_boost_enabled=True,
+        inst_type=plant.inst_type
     )
     
     chp_res = calculate_chp_and_filter_elimination_benchmark(
@@ -705,19 +691,10 @@ def calculate_field_vs_potential_benchmark(
     pot_pcs = meas_pcs * (val_res["new_ch4_pct"] / max(1.0, meas_ch4_pct))
     
     wobbe_meas = calculate_wobbe_index(
-        ch4_pct=meas_ch4_pct,
-        co2_pct=meas_co2_pct,
-        o2_pct=meas_o2_pct,
-        pcs_mj_m3=meas_pcs,
-        pci_mj_m3=meas_pci
+        ch4_pct=meas_ch4_pct, co2_pct=meas_co2_pct, o2_pct=meas_o2_pct, pcs_mj_m3=meas_pcs, pci_mj_m3=meas_pci
     )
-    
     wobbe_pot = calculate_wobbe_index(
-        ch4_pct=val_res["new_ch4_pct"],
-        co2_pct=max(0.0, meas_co2_pct - delta_ch4_pct),
-        o2_pct=meas_o2_pct,
-        pcs_mj_m3=pot_pcs,
-        pci_mj_m3=pot_pci
+        ch4_pct=val_res["new_ch4_pct"], co2_pct=max(0.0, meas_co2_pct - delta_ch4_pct), o2_pct=meas_o2_pct, pcs_mj_m3=pot_pcs, pci_mj_m3=pot_pci
     )
     
     total_gross_gain_yr = val_res["extra_revenue_volume_yr"] + chp_res["total_combined_savings_yr"]
@@ -773,10 +750,6 @@ def calculate_wobbe_index(
     pcs_mj_m3: float = None,
     pci_mj_m3: float = None
 ) -> Dict[str, Any]:
-    """
-    Berekent de relatieve dichtheid (d) en de Bovenste/Onderste Wobbe-index (Ws / Wi)
-    voor procesbewaking in de WKK en kwalificatie voor netinvoeding (G-gas / H-gas).
-    """
     y_ch4 = max(0.01, min(1.0, ch4_pct / 100.0))
     y_co2 = max(0.0, min(1.0, (co2_pct if co2_pct is not None else (100.0 - ch4_pct - o2_pct - n2_pct)) / 100.0))
     y_o2 = max(0.0, min(0.1, o2_pct / 100.0))
@@ -855,11 +828,6 @@ def calculate_pci_pcs_moisture_balance(
     gas_dewpoint_c: float = 4.0,
     chp_condensing_efficiency: float = 0.90
 ) -> Dict[str, Any]:
-    """
-    Kwantificeert het thermodynamische verschil tussen PCI (LHV) en PCS (HHV),
-    de waterdampverzadiging bij vergistingstemperatuur, condensaatafscheiding
-    bij gaskoeling en het potentieel voor rookgascondensatie-warmteterugwinning.
-    """
     p_sat_raw = 0.61078 * np.exp((17.27 * temp_c) / (temp_c + 237.3))
     x_h2o_raw = min(0.25, max(0.01, p_sat_raw / 101.325))
     h2o_g_per_nm3_raw = float((x_h2o_raw * 18.015) / 0.022414)
@@ -903,4 +871,136 @@ def calculate_pci_pcs_moisture_balance(
         "combustion_water_latent_mj": round(combustion_water_latent_mj, 2),
         "latent_heat_diff_pct": round(((pcs_dry_mj - pci_dry_mj) / max(0.1, pci_dry_mj)) * 100.0, 1),
         "flue_gas_condensing_gain_kwh_m3": round(flue_gas_condensing_gain_kwh_m3, 2)
+    }
+
+# ============================================================================
+# 12. SUBSTRAAT & RECEPTOPTIMALISATIE (LEAST-COST FEED - LINEAR PROGRAMMING)
+# ============================================================================
+
+def optimize_least_cost_recipe(
+    substrates_db: Dict[str, Any],
+    substrate_prices: Dict[str, float],
+    target_daily_biogas_m3: float = 12000.0,
+    reactor_volume_m3: float = 2500.0,
+    max_olr: float = 11.5,
+    min_manure_tons: float = 30.0
+) -> Dict[str, Any]:
+    """
+    Berekent de optimale, kostenefficiëntste dagelijkse substraatmix (Linear Programming)
+    waarbij de gasdoelstelling wordt gehaald binnen de biologische OLR- en volumegrenzen.
+    """
+    sub_names = list(substrates_db.keys())
+    
+    c = [substrate_prices.get(name, substrates_db[name].get("price_per_ton", 0.0)) for name in sub_names]
+    
+    A_ub = []
+    b_ub = []
+    bounds = []
+    
+    for name in sub_names:
+        is_manure = "mest" in name.lower() or "drijfmest" in name.lower()
+        if is_manure:
+            bounds.append((min_manure_tons, 100.0))
+        else:
+            bounds.append((0.0, 60.0))
+            
+    gas_row = []
+    for name in sub_names:
+        sub = substrates_db[name]
+        vs_pct = sub.get("vs_pct", 0.85)
+        gas_yield = sub.get("biogas_m3_per_ton_odm", 450.0)
+        m3_per_ton = (sub["ts_pct"] * 1000.0 * vs_pct / 1000.0) * gas_yield
+        gas_row.append(-m3_per_ton)
+    
+    A_ub.append(gas_row)
+    b_ub.append(-target_daily_biogas_m3)
+    
+    olr_row = []
+    for name in sub_names:
+        sub = substrates_db[name]
+        vs_pct = sub.get("vs_pct", 0.85)
+        kg_odm_per_ton = sub["ts_pct"] * 1000.0 * vs_pct
+        olr_row.append(kg_odm_per_ton)
+        
+    A_ub.append(olr_row)
+    b_ub.append(reactor_volume_m3 * max_olr)
+    
+    res = linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method="highs")
+    
+    optimal_diet = {}
+    total_cost = 0.0
+    total_gas = 0.0
+    total_odm = 0.0
+    
+    if res.success:
+        for i, name in enumerate(sub_names):
+            tons = round(float(res.x[i]), 2)
+            optimal_diet[name] = tons
+            sub = substrates_db[name]
+            price = substrate_prices.get(name, sub.get("price_per_ton", 0.0))
+            total_cost += tons * price
+            vs_pct = sub.get("vs_pct", 0.85)
+            odm = tons * sub["ts_pct"] * vs_pct
+            total_odm += odm
+            total_gas += odm * sub.get("biogas_m3_per_ton_odm", 450.0)
+    else:
+        for name in sub_names:
+            optimal_diet[name] = 10.0 if "mest" in name.lower() else 5.0
+            
+    return {
+        "success": res.success,
+        "message": res.message if hasattr(res, "message") else "Geoptimaliseerd",
+        "optimal_diet": optimal_diet,
+        "total_cost_eur": round(total_cost, 2),
+        "total_biogas_m3": round(total_gas, 0),
+        "total_odm_kg": round(total_odm * 1000.0, 0),
+        "calculated_olr": round((total_odm * 1000.0) / max(1.0, reactor_volume_m3), 2)
+    }
+# ============================================================================
+# 13. RED II / ISCC EU DUURZAAMHEIDS- EN EMISSIEBALANS (GHG REDUCTIE)
+# ============================================================================
+
+def calculate_red_ii_ghg_balance(
+    manure_share_pct: float = 60.0,
+    maize_share_pct: float = 30.0,
+    industrial_waste_share_pct: float = 10.0,
+    transport_distance_km: float = 25.0,
+    methane_leakage_pct: float = 1.0,
+    upgrade_type: str = "Membraanfiltratie"
+) -> Dict[str, Any]:
+    """
+    Berekent de broeikasgasemissies (GHG) en reductiepercentage volgens de Europese 
+    RED II richtlijn (EU 2018/2001) ten opzichte van de fossiele referentie (94.0 gCO2eq/MJ).
+    """
+    fossil_comparator = 94.0  # gCO2eq/MJ voor fossiele referentie
+    
+    ep_maize = (maize_share_pct / 100.0) * 22.5
+    ep_manure = (manure_share_pct / 100.0) * -45.0  # Mestverwerking geeft vermeden emissies
+    ep_waste = (industrial_waste_share_pct / 100.0) * 1.0
+    ep_total = ep_maize + ep_manure + ep_waste
+    
+    upgrade_penalties = {
+        "Membraanfiltratie": 8.5,
+        "Wassiging (Water Scrubbing)": 11.0,
+        "Amine-was": 9.5,
+        "Geen (Alleen WKK)": 4.0
+    }
+    eprocess = upgrade_penalties.get(upgrade_type, 8.5)
+    emethane_leak = methane_leakage_pct * 14.2
+    etd = (transport_distance_km / 50.0) * 3.2
+    
+    total_ghg_emissions = max(1.0, ep_total + eprocess + emethane_leak + etd)
+    ghg_saving_pct = ((fossil_comparator - total_ghg_emissions) / fossil_comparator) * 100.0
+    is_compliant = ghg_saving_pct >= 80.0
+    
+    return {
+        "fossil_comparator": fossil_comparator,
+        "total_ghg_emissions": round(total_ghg_emissions, 2),
+        "ghg_saving_pct": round(ghg_saving_pct, 1),
+        "ep_total": round(ep_total, 2),
+        "eprocess": round(eprocess, 2),
+        "emethane_leak": round(emethane_leak, 2),
+        "etd": round(etd, 2),
+        "is_compliant": is_compliant,
+        "compliance_status": "🟢 Voldoet aan RED II norm (>= 80% reductie)" if is_compliant else "🔴 Voldoet niet aan strenge RED II drempel"
     }
