@@ -1,0 +1,16 @@
+{
+    "SwissBiogas AG": {
+        "installations": {
+            "1MW Agro Installatie": {
+                "volume_m3": 2500.0,
+                "flow_m3_h": 500.0,
+                "inst_type": "agro",
+                "temp_regime": "Mesofiel",
+                "sbg_product": "SBG Agro",
+                "ph_nominal": 7.65,
+                "temp_c": 38.5,
+                "biogas_price_per_m3": 0.68
+            }
+        }
+    }
+}

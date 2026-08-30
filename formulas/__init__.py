@@ -1,31 +1,15 @@
-"""
-formulas/__init__.py - Package initialisatie en re-exports.
-"""
+from dataclasses import dataclass
 
-from .core import (
-    PlantProfile,
-    M_S, M_FE, M_FE2O3, M_FEO, FE_PER_KG_PRODUCT, FE_TO_S_RATIO,
-    calculate_h2s_gas_fraction,
-    calculate_fe_dissolution_rate,
-    calculate_free_ammonia_nh3,
-    calculate_fos_tac_soft_sensor,
-    calculate_wobbe_index,
-    calculate_red_ii_ghg_balance
-)
+@dataclass
+class PlantProfile:
+    name: str = "Corte Pila (Italië) - 1MW CSTR"
+    inst_type: str = "agro"
+    temp_regime: str = "Mesofiel"
+    volume_m3: float = 2500.0
+    biogas_flow_m3_h: float = 500.0
+    ph_nominal: float = 7.65
+    temp_c: float = 38.5
+    biogas_price_per_m3: float = 0.68
 
-from .kinetics import (
-    run_kinetics_calculation,
-    validate_plan_safety
-)
-
-from .economics import (
-    calculate_h2s_valorisation_and_yield_gain,
-    calculate_activated_carbon_benchmark,
-    calculate_field_vs_potential_benchmark
-)
-
-from .optimization import (
-    optimize_least_cost_recipe,
-    optimize_multiday_least_cost_recipe,
-    calculate_substrate_sensitivity_analysis
-)
+from .optimization import optimize_dosage_cost, calculate_economic_return
+from .sustainability import calculate_red_ii_ghg_balance
