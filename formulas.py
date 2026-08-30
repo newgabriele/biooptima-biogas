@@ -2,7 +2,7 @@
 formulas.py - Kinetische rekenengine, proceschemie, H2S/NH3-inhibitie,
 DM-Verdunningsbalans, Gesynchroniseerde Validatie, H2S-Gasvalorisatie, 
 Actieve Kool Standtijd, WKK/CHP Olie-exploitatie, Benchmarkvergelijking, 
-Wobbe-Index & PCI/PCS Thermodynamica.
+Wobbe-Index, PCI/PCS Thermodynamica & Least-Cost Optimalisatie.
 """
 
 from dataclasses import dataclass
@@ -414,7 +414,7 @@ def validate_plan_safety(
     return is_safe, errors
 
 # ============================================================================
-# 6. H2S VALORISATIE & THEORETISCHE GASOPBRENGSTVERHOGING (STAP 1)
+# 6. H2S VALORISATIE & THEORETISCHE GASOPBRENGSTVERHOGING
 # ============================================================================
 
 def calculate_h2s_valorisation_and_yield_gain(
@@ -509,7 +509,7 @@ def calculate_h2s_valorisation_and_yield_gain(
     }
 
 # ============================================================================
-# 7. ACTIEVE KOOLFILTER STANDTIJD & EXPLOITATIE BENCHMARK (STAP 2)
+# 7. ACTIEVE KOOLFILTER STANDTIJD & EXPLOITATIE BENCHMARK
 # ============================================================================
 
 def calculate_activated_carbon_benchmark(
@@ -567,7 +567,7 @@ def calculate_activated_carbon_benchmark(
     }
 
 # ============================================================================
-# 8. WKK / CHP MOTORSTANDTIJD, OLIEWISSELS & FILTERELIMINATIE (STAP 3)
+# 8. WKK / CHP MOTORSTANDTIJD, OLIEWISSELS & FILTERELIMINATIE
 # ============================================================================
 
 def calculate_chp_and_filter_elimination_benchmark(
@@ -883,14 +883,13 @@ def optimize_least_cost_recipe(
     target_daily_biogas_m3: float = 12000.0,
     reactor_volume_m3: float = 2500.0,
     max_olr: float = 11.5,
-    min_manure_tons: float = 30.0
+    min_manure_tons: float = 30.0,
+    max_tan_mg_l: float = 3000.0,
+    hrt_days: float = 50.0,
+    fe_product_price_per_kg: float = 1.20,
+    safety_margin: float = 1.25
 ) -> Dict[str, Any]:
-    """
-    Berekent de optimale, kostenefficiëntste dagelijkse substraatmix (Linear Programming)
-    waarbij de gasdoelstelling wordt gehaald binnen de biologische OLR- en volumegrenzen.
-    """
     sub_names = list(substrates_db.keys())
-    
     c = [substrate_prices.get(name, substrates_db[name].get("price_per_ton", 0.0)) for name in sub_names]
     
     A_ub = []
@@ -904,6 +903,7 @@ def optimize_least_cost_recipe(
         else:
             bounds.append((0.0, 60.0))
             
+    # 1. Biogas opbrengst constraint
     gas_row = []
     for name in sub_names:
         sub = substrates_db[name]
@@ -911,26 +911,38 @@ def optimize_least_cost_recipe(
         gas_yield = sub.get("biogas_m3_per_ton_odm", 450.0)
         m3_per_ton = (sub["ts_pct"] * 1000.0 * vs_pct / 1000.0) * gas_yield
         gas_row.append(-m3_per_ton)
-    
     A_ub.append(gas_row)
     b_ub.append(-target_daily_biogas_m3)
     
+    # 2. Maximale OLR constraint
     olr_row = []
     for name in sub_names:
         sub = substrates_db[name]
         vs_pct = sub.get("vs_pct", 0.85)
         kg_odm_per_ton = sub["ts_pct"] * 1000.0 * vs_pct
         olr_row.append(kg_odm_per_ton)
-        
     A_ub.append(olr_row)
     b_ub.append(reactor_volume_m3 * max_olr)
+    
+    # 3. Stikstof & TAN Inhibitie Constraint
+    max_allowed_n_inflow_kg = (max_tan_mg_l * reactor_volume_m3) / (max(10.0, hrt_days) * 1000.0)
+    n_row = []
+    for name in sub_names:
+        sub = substrates_db[name]
+        ts_pct = sub.get("ts_pct", 0.2)
+        n_g_kg_ts = sub.get("n_g_per_kg_ts", 10.0)
+        n_row.append(ts_pct * n_g_kg_ts)
+    A_ub.append(n_row)
+    b_ub.append(max_allowed_n_inflow_kg)
     
     res = linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method="highs")
     
     optimal_diet = {}
-    total_cost = 0.0
+    total_substrate_cost = 0.0
     total_gas = 0.0
     total_odm = 0.0
+    total_n_kg = 0.0
+    total_s_kg = 0.0
     
     if res.success:
         for i, name in enumerate(sub_names):
@@ -938,24 +950,44 @@ def optimize_least_cost_recipe(
             optimal_diet[name] = tons
             sub = substrates_db[name]
             price = substrate_prices.get(name, sub.get("price_per_ton", 0.0))
-            total_cost += tons * price
+            total_substrate_cost += tons * price
+            
             vs_pct = sub.get("vs_pct", 0.85)
             odm = tons * sub["ts_pct"] * vs_pct
             total_odm += odm
             total_gas += odm * sub.get("biogas_m3_per_ton_odm", 450.0)
+            
+            ts_pct = sub.get("ts_pct", 0.2)
+            total_n_kg += tons * ts_pct * sub.get("n_g_per_kg_ts", 10.0)
+            total_s_kg += tons * 1000.0 * ts_pct * (sub.get("s_g_per_kg_ts", 4.0) / 1000.0)
     else:
         for name in sub_names:
             optimal_diet[name] = 10.0 if "mest" in name.lower() else 5.0
+            
+    # Automatische IJzerdosering & Kostenberekening
+    effective_fe_per_kg = FE_PER_KG_PRODUCT  # uit formulas.py constanten
+    fe_needed_kg = (total_s_kg * FE_TO_S_RATIO * safety_margin) / effective_fe_per_kg if effective_fe_per_kg > 0 else 0.0
+    fe_bags_day = int(np.ceil(fe_needed_kg / 20.0))
+    fe_cost_day = fe_needed_kg * fe_product_price_per_kg
+    total_combined_cost = total_substrate_cost + fe_cost_day
+    estimated_tan = (total_n_kg * hrt_days) / reactor_volume_m3 * 1000.0 if reactor_volume_m3 > 0 else 0.0
             
     return {
         "success": res.success,
         "message": res.message if hasattr(res, "message") else "Geoptimaliseerd",
         "optimal_diet": optimal_diet,
-        "total_cost_eur": round(total_cost, 2),
+        "total_substrate_cost_eur": round(total_substrate_cost, 2),
+        "fe_needed_kg": round(fe_needed_kg, 1),
+        "fe_bags_day": fe_bags_day,
+        "fe_cost_eur": round(fe_cost_day, 2),
+        "total_cost_eur": round(total_combined_cost, 2),
         "total_biogas_m3": round(total_gas, 0),
         "total_odm_kg": round(total_odm * 1000.0, 0),
-        "calculated_olr": round((total_odm * 1000.0) / max(1.0, reactor_volume_m3), 2)
+        "calculated_olr": round((total_odm * 1000.0) / max(1.0, reactor_volume_m3), 2),
+        "estimated_tan_mg_l": round(estimated_tan, 0),
+        "total_s_kg": round(total_s_kg, 1)
     }
+
 # ============================================================================
 # 13. RED II / ISCC EU DUURZAAMHEIDS- EN EMISSIEBALANS (GHG REDUCTIE)
 # ============================================================================
@@ -1004,3 +1036,194 @@ def calculate_red_ii_ghg_balance(
         "is_compliant": is_compliant,
         "compliance_status": "🟢 Voldoet aan RED II norm (>= 80% reductie)" if is_compliant else "🔴 Voldoet niet aan strenge RED II drempel"
     }
+# ============================================================================
+# 14. MULTI-DAY HORIZON OPTIMALISATIE (MODEL PREDICTIVE CONTROL - MPC)
+# ============================================================================
+
+def optimize_multiday_least_cost_recipe(
+    substrates_db: Dict[str, Any],
+    substrate_prices: Dict[str, float],
+    target_daily_biogas_m3: float = 12000.0,
+    reactor_volume_m3: float = 2500.0,
+    max_olr: float = 11.5,
+    min_manure_tons: float = 30.0,
+    max_tan_mg_l: float = 3000.0,
+    hrt_days: float = 50.0,
+    fe_product_price_per_kg: float = 1.20,
+    safety_margin: float = 1.25,
+    horizon_days: int = 7
+) -> Dict[str, Any]:
+    sub_names = list(substrates_db.keys())
+    n_subs = len(sub_names)
+    total_vars = n_subs * horizon_days
+    
+    c = []
+    for _ in range(horizon_days):
+        for name in sub_names:
+            c.append(substrate_prices.get(name, substrates_db[name].get("price_per_ton", 0.0)))
+            
+    A_ub = []
+    b_ub = []
+    bounds = []
+    
+    for _ in range(horizon_days):
+        for name in sub_names:
+            is_manure = "mest" in name.lower() or "drijfmest" in name.lower()
+            if is_manure:
+                bounds.append((min_manure_tons, 100.0))
+            else:
+                bounds.append((0.0, 60.0))
+                
+    max_allowed_n_inflow_kg = (max_tan_mg_l * reactor_volume_m3) / (max(10.0, hrt_days) * 1000.0)
+                
+    for d in range(horizon_days):
+        gas_row = [0.0] * total_vars
+        for i, name in enumerate(sub_names):
+            sub = substrates_db[name]
+            vs_pct = sub.get("vs_pct", 0.85)
+            gas_yield = sub.get("biogas_m3_per_ton_odm", 450.0)
+            m3_per_ton = (sub["ts_pct"] * 1000.0 * vs_pct / 1000.0) * gas_yield
+            gas_row[d * n_subs + i] = -m3_per_ton
+        A_ub.append(gas_row)
+        b_ub.append(-target_daily_biogas_m3)
+        
+        olr_row = [0.0] * total_vars
+        for i, name in enumerate(sub_names):
+            sub = substrates_db[name]
+            vs_pct = sub.get("vs_pct", 0.85)
+            kg_odm_per_ton = sub["ts_pct"] * 1000.0 * vs_pct
+            olr_row[d * n_subs + i] = kg_odm_per_ton
+        A_ub.append(olr_row)
+        b_ub.append(reactor_volume_m3 * max_olr)
+        
+        n_row = [0.0] * total_vars
+        for i, name in enumerate(sub_names):
+            sub = substrates_db[name]
+            ts_pct = sub.get("ts_pct", 0.2)
+            n_row[d * n_subs + i] = ts_pct * sub.get("n_g_per_kg_ts", 10.0)
+        A_ub.append(n_row)
+        b_ub.append(max_allowed_n_inflow_kg)
+        
+        if d > 0:
+            for i, name in enumerate(sub_names):
+                sub = substrates_db[name]
+                if sub.get("vfa_risk", 0.0) > 2.0:
+                    smooth_row = [0.0] * total_vars
+                    smooth_row[d * n_subs + i] = 1.0
+                    smooth_row[(d - 1) * n_subs + i] = -1.0
+                    A_ub.append(smooth_row)
+                    b_ub.append(10.0)
+
+    res = linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method="highs")
+    
+    schedule_results = []
+    total_horizon_cost = 0.0
+    total_horizon_substrate_cost = 0.0
+    total_horizon_fe_cost = 0.0
+    total_horizon_gas = 0.0
+    
+    if res.success:
+        for d in range(horizon_days):
+            day_diet = {}
+            day_sub_cost = 0.0
+            day_gas = 0.0
+            day_odm = 0.0
+            day_n = 0.0
+            day_s = 0.0
+            
+            for i, name in enumerate(sub_names):
+                tons = round(float(res.x[d * n_subs + i]), 2)
+                day_diet[name] = tons
+                sub = substrates_db[name]
+                price = substrate_prices.get(name, sub.get("price_per_ton", 0.0))
+                day_sub_cost += tons * price
+                
+                vs_pct = sub.get("vs_pct", 0.85)
+                ts_pct = sub.get("ts_pct", 0.2)
+                odm = tons * ts_pct * vs_pct
+                day_odm += odm
+                day_gas += odm * sub.get("biogas_m3_per_ton_odm", 450.0)
+                day_n += tons * ts_pct * sub.get("n_g_per_kg_ts", 10.0)
+                day_s += tons * 1000.0 * ts_pct * (sub.get("s_g_per_kg_ts", 4.0) / 1000.0)
+                
+            fe_needed_d = (day_s * FE_TO_S_RATIO * safety_margin) / FE_PER_KG_PRODUCT
+            fe_bags_d = int(np.ceil(fe_needed_d / 20.0))
+            fe_cost_d = fe_needed_d * fe_product_price_per_kg
+            day_total_cost = day_sub_cost + fe_cost_d
+            
+            total_horizon_substrate_cost += day_sub_cost
+            total_horizon_fe_cost += fe_cost_d
+            total_horizon_cost += day_total_cost
+            total_horizon_gas += day_gas
+            est_tan = (day_n * hrt_days) / reactor_volume_m3 * 1000.0
+            
+            schedule_results.append({
+                "dag": f"Dag t+{d}" if d > 0 else "Dag t0 (Vandaag)",
+                "diet": day_diet,
+                "dag_sub_cost_eur": round(day_sub_cost, 2),
+                "fe_bags": fe_bags_d,
+                "fe_cost_eur": round(fe_cost_d, 2),
+                "dag_totaal_kosten_eur": round(day_total_cost, 2),
+                "dag_biogas_m3": round(day_gas, 0),
+                "dag_olr": round((day_odm * 1000.0) / max(1.0, reactor_volume_m3), 2),
+                "est_tan_mg_l": round(est_tan, 0),
+                "dag_s_kg": round(day_s, 1)
+            })
+            
+    return {
+        "success": res.success,
+        "message": res.message if hasattr(res, "message") else "MPC Geoptimaliseerd",
+        "horizon_days": horizon_days,
+        "total_substrate_cost_eur": round(total_horizon_substrate_cost, 2),
+        "total_fe_cost_eur": round(total_horizon_fe_cost, 2),
+        "total_cost_eur": round(total_horizon_cost, 2),
+        "avg_daily_cost_eur": round(total_horizon_cost / horizon_days, 2),
+        "total_biogas_m3": round(total_horizon_gas, 0),
+        "schedule": schedule_results
+    }
+# ============================================================================
+# 15. GEVOELIGHEIDSANALYSE & PRIJSVOLATILITEIT (SCENARIO-ANALYSE)
+# ============================================================================
+
+def calculate_substrate_sensitivity_analysis(
+    substrates_db: Dict[str, Any],
+    base_substrate_prices: Dict[str, float],
+    target_daily_biogas_m3: float = 12000.0,
+    reactor_volume_m3: float = 2500.0,
+    max_olr: float = 11.5,
+    target_substrate: str = "maissilage",
+    price_variation_pct_range: List[float] = [-50.0, -25.0, 0.0, 25.0, 50.0, 100.0]
+) -> pd.DataFrame:
+    """
+    Berekent de gevoeligheid van de totale dagkosten en de optimale receptuur 
+    bij prijsschommelingen van een specifiek substraat (scenario-analyse).
+    """
+    results = []
+    base_price = base_substrate_prices.get(target_substrate, 0.0)
+    
+    for pct in price_variation_pct_range:
+        current_prices = base_substrate_prices.copy()
+        new_price = base_price * (1.0 + (pct / 100.0))
+        current_prices[target_substrate] = new_price
+        
+        opt_res = optimize_least_cost_recipe(
+            substrates_db=substrates_db,
+            substrate_prices=current_prices,
+            target_daily_biogas_m3=target_daily_biogas_m3,
+            reactor_volume_m3=reactor_volume_m3,
+            max_olr=max_olr
+        )
+        
+        if opt_res["success"]:
+            diet = opt_res["optimal_diet"]
+            tonnage = diet.get(target_substrate, 0.0)
+            results.append({
+                "Prijsvariatie (%)": pct,
+                "Substraatijs (€/ton)": round(new_price, 2),
+                "Ingezet Tonage (t/dag)": round(tonnage, 1),
+                "Totale Dagkosten (€/dag)": opt_res["total_cost_eur"],
+                "Totale Biogas (m³)": opt_res["total_biogas_m3"],
+                "Berekende OLR": opt_res["calculated_olr"]
+            })
+            
+    return pd.DataFrame(results)

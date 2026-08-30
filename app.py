@@ -113,7 +113,6 @@ def main():
 
     choice = st.sidebar.radio("Navigatie", menu_options)
 
-    # Dynamische weergave van de actieve werf uit Tab 7
     current_plant = st.session_state.get('active_plant', 'Corte Pila (Italië) - 1MW CSTR')
 
     st.sidebar.markdown("---")
