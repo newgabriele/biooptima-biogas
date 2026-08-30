@@ -1,108 +1,155 @@
+# tabs/tab1_config.py
 import streamlit as st
+from formulas import PlantProfile
 
 def render():
-    st.subheader("⚙️ Tab 1: Plant Configuratie & Asset Beheer")
-    st.markdown("Centraal beheer van industriële CSTR-installaties, reactorvolumeflows en de actieve dual-valence additiefsamenstelling per werf.")
+    st.subheader("Klanten- en Installatiebeheer")
+    st.markdown("Beheer uw klantenportefeuille, installaties en het toegepaste SBG-producttype.")
 
-    st.info("💡 **Enterprise Asset Management:** Selecteer een bestaande installatie of voeg een nieuwe werf toe. Alle instellingen worden direct gekoppeld aan de actieve plant.")
-
-    # Initialiseer de installatielijst in session_state
-    if "installations_dict" not in st.session_state:
-        st.session_state.installations_dict = {
-            "Corte Pila (Italië) - 1MW CSTR": {
-                "flow": 500.0,
-                "volume": 3500.0,
-                "temp": 38.5,
-                "fe2o3": 35,
-                "feo": 35,
-                "target_h2s": 80,
-                "status": "Actief (Optimized)"
-            },
-            "BioEnergy Noord (Nederland) - 0.8MW": {
-                "flow": 400.0,
-                "volume": 2800.0,
-                "temp": 38.0,
-                "fe2o3": 35,
-                "feo": 35,
-                "target_h2s": 90,
-                "status": "Actief (Standard)"
-            },
-            "Biogás Sur (Frankrijk) - 1.2MW": {
-                "flow": 600.0,
-                "volume": 4200.0,
-                "temp": 39.0,
-                "fe2o3": 40,
-                "target_h2s": 75,
-                "status": "In Kalibratie"
+    if "clients_db" not in st.session_state:
+        st.session_state.clients_db = {
+            "SwissBiogas AG": {
+                "installations": {
+                    "Biogasanlage Almere (1MW Agro)": {
+                        "volume_m3": 2500.0,
+                        "flow_m3_h": 450.0,
+                        "inst_type": "agro",
+                        "temp_regime": "Mesofiel",
+                        "sbg_product": "SBG Agro",
+                        "ph_nominal": 7.65,
+                        "temp_c": 38.5,
+                        "biogas_price_per_m3": 0.68
+                    }
+                }
             }
         }
 
-    if "active_plant" not in st.session_state:
-        st.session_state.active_plant = list(st.session_state.installations_dict.keys())[0]
-
-    col_sel1, col_sel2 = st.columns([2, 1])
-    
+    col_sel1, col_sel2 = st.columns(2)
     with col_sel1:
-        selected_plant = st.selectbox(
-            "🏭 Selecteer Actieve Werf / Installatie",
-            list(st.session_state.installations_dict.keys()),
-            index=list(st.session_state.installations_dict.keys()).index(st.session_state.active_plant)
-        )
-        st.session_state.active_plant = selected_plant
-
+        clients_list = list(st.session_state.clients_db.keys())
+        selected_client = st.selectbox("Selecteer Klant", clients_list, key="sel_client")
+    
+    client_data = st.session_state.clients_db[selected_client]
+    installations_list = list(client_data["installations"].keys())
+    
     with col_sel2:
-        with st.expander("➕ Nieuwe Werf Toevoegen"):
-            new_plant_name = st.text_input("Naam & Capaciteit (bijv. BioPlant DE - 1MW)")
-            if st.button("Voeg Toe"):
-                if new_plant_name and new_plant_name not in st.session_state.installations_dict:
-                    st.session_state.installations_dict[new_plant_name] = {
-                        "flow": 500.0,
-                        "volume": 3500.0,
-                        "temp": 38.5,
-                        "fe2o3": 35,
-                        "feo": 35,
-                        "target_h2s": 80,
-                        "status": "Nieuw"
-                    }
-                    st.session_state.active_plant = new_plant_name
-                    st.success(f"Werf '{new_plant_name}' toegevoegd!")
-                    st.rerun()
-
-    # Haal de data op van de momenteel geselecteerde plant
-    plant_data = st.session_state.installations_dict[selected_plant]
-
-    st.markdown("---")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("### 🏭 Reactor & Procesparameters")
-        biogas_flow = st.number_input("Nominaal Biogasdebiet (m³/h)", value=float(plant_data["flow"]), step=10.0, key="cfg_flow")
-        reactor_volume = st.number_input("Reactor Volume (m³)", value=float(plant_data["volume"]), step=50.0, key="cfg_vol")
-        reactor_temp = st.number_input("Verteringstemperatuur (°C)", value=float(plant_data["temp"]), step=0.5, format="%.1f", key="cfg_temp")
-        reactor_type = st.selectbox("Type Verter", ["CSTR (Continu Stirred-Tank Reactor)", "Plug Flow Reactor", "Upflow Anaerobic Sludge Blanket (UASB)"])
-
-    with col2:
-        st.markdown("### 🧪 Additief & Chemie Specificatie")
-        fe2o3_pct = st.slider("Fe₂O₃ Percentage (%)", 0, 100, int(plant_data["fe2o3"]), key="cfg_fe2o3")
-        feo_pct = st.slider("FeO Percentage (%)", 0, 100, int(plant_data["feo"]), key="cfg_feo")
-        
-        total_active = fe2o3_pct + feo_pct
-        st.markdown(f"**Totaal Actieve Componenten:** {total_active}%")
-        if total_active != 70:
-            st.warning("⚠️ Standaard BioOptima formulering adviseert een gebalanceerde 35%/35% dual-valence mix.")
+        if installations_list:
+            selected_inst = st.selectbox("Selecteer Actieve Installatie", installations_list, key="sel_inst")
         else:
-            st.success("✅ Dual-valence balans optimaal ingesteld (35% Fe₂O₃ / 35% FeO).")
+            selected_inst = None
+            st.warning("Geen installaties gevonden voor deze klant.")
 
-        target_h2s = st.number_input("Doel H₂S vloeistoffase (ppm)", value=int(plant_data["target_h2s"]), min_value=20, max_value=200, key="cfg_h2s")
+    if selected_inst and selected_inst in client_data["installations"]:
+        inst_meta = client_data["installations"][selected_inst]
+        st.session_state.active_plant = PlantProfile(
+            name=f"{selected_client} - {selected_inst}",
+            inst_type=inst_meta["inst_type"],
+            temp_regime=inst_meta.get("temp_regime", "Mesofiel"),
+            volume_m3=inst_meta["volume_m3"],
+            biogas_flow_m3_h=inst_meta["flow_m3_h"],
+            ph_nominal=inst_meta["ph_nominal"],
+            temp_c=inst_meta["temp_c"],
+            biogas_price_per_m3=inst_meta.get("biogas_price_per_m3", 0.68)
+        )
 
     st.markdown("---")
-    if st.button("💾 Opslaan & Validatie Configuratie voor deze Werf"):
-        # Sla wijzigingen direct op in het dictionary van deze specifieke plant
-        plant_data["flow"] = biogas_flow
-        plant_data["volume"] = reactor_volume
-        plant_data["temp"] = reactor_temp
-        plant_data["fe2o3"] = fe2o3_pct
-        plant_data["feo"] = feo_pct
-        plant_data["target_h2s"] = target_h2s
-        st.success(f"Configuratie voor **{selected_plant}** succesvol opgeslagen en doorgevoerd naar het kinetisch model!")
+
+    tab_klant, tab_inst = st.tabs(["Stap 1: Klanten Beheeren", "Stap 2: Installaties Beheren"])
+
+    with tab_klant:
+        st.markdown("#### Klant toevoegen of naam wijzigen")
+        
+        c_col1, c_col2 = st.columns(2)
+        with c_col1:
+            with st.form("add_client_form"):
+                new_c_name = st.text_input("Nieuwe Klantnaam")
+                if st.form_submit_button("Klant Toevoegen"):
+                    if new_c_name and new_c_name not in st.session_state.clients_db:
+                        st.session_state.clients_db[new_c_name] = {"installations": {}}
+                        st.success(f"Klant '{new_c_name}' toegevoegd.")
+                        st.rerun()
+                    else:
+                        st.error("Vul een unieke, geldige klantnaam in.")
+        
+        with c_col2:
+            with st.form("rename_client_form"):
+                rename_to = st.text_input("Hernoem geselecteerde klant", value=selected_client)
+                if st.form_submit_button("Klantnaam Wijzigen"):
+                    if rename_to and rename_to != selected_client:
+                        st.session_state.clients_db[rename_to] = st.session_state.clients_db.pop(selected_client)
+                        st.success(f"Klant hernoemd naar '{rename_to}'.")
+                        st.rerun()
+
+    with tab_inst:
+        st.markdown(f"#### Installatie toevoegen voor klant: **{selected_client}**")
+
+        with st.form("add_installation_form"):
+            i_name = st.text_input("Installatienaam", value="Biogasinstallatie (1MW Agro)")
+            
+            i_col1, i_col2 = st.columns(2)
+            with i_col1:
+                i_type = st.selectbox("Vergistingsproces", ["agro", "covergisting", "industrie"], index=0)
+                i_regime = st.selectbox("Thermisch Regime", ["Mesofiel", "Thermofiel"], index=0)
+                i_sbg = st.selectbox("SBG Productlijn", ["SBG Agro", "SBG Energo", "SBG Industrial"], index=0)
+            with i_col2:
+                i_vol = st.number_input("Reactorvolume (m³)", value=2500.0, step=100.0)
+                i_flow = st.number_input("Biogasdebiet (m³/h)", value=450.0, step=25.0)
+                i_temp = st.number_input("Bedrijfstemperatuur (°C)", value=38.5, step=0.5)
+
+            i_ph = st.number_input("Nominale pH", value=7.65, step=0.05)
+
+            if st.form_submit_button("Installatie Toevoegen"):
+                if i_name:
+                    st.session_state.clients_db[selected_client]["installations"][i_name] = {
+                        "volume_m3": i_vol,
+                        "flow_m3_h": i_flow,
+                        "inst_type": i_type,
+                        "temp_regime": i_regime,
+                        "sbg_product": i_sbg,
+                        "ph_nominal": i_ph,
+                        "temp_c": i_temp,
+                        "biogas_price_per_m3": 0.68
+                    }
+                    st.success(f"Installatie '{i_name}' toegevoegd.")
+                    st.rerun()
+                else:
+                    st.error("Geef een geldige installatienaam op.")
+
+        if selected_inst:
+            st.markdown("---")
+            st.markdown(f"#### Bewerk actieve installatie: `{selected_inst}`")
+            current_meta = client_data["installations"][selected_inst]
+            
+            with st.form("edit_existing_inst_form"):
+                e_col1, e_col2 = st.columns(2)
+                type_options = ["agro", "covergisting", "industrie"]
+                regime_options = ["Mesofiel", "Thermofiel"]
+                sbg_options = ["SBG Agro", "SBG Energo", "SBG Industrial"]
+                
+                cur_sbg = current_meta.get("sbg_product", "SBG Agro")
+                if cur_sbg not in sbg_options:
+                    cur_sbg = "SBG Agro"
+
+                with e_col1:
+                    e_type = st.selectbox("Vergistingsproces", type_options, index=type_options.index(current_meta["inst_type"]))
+                    e_regime = st.selectbox("Thermisch Regime", regime_options, index=regime_options.index(current_meta.get("temp_regime", "Mesofiel")))
+                    e_sbg = st.selectbox("SBG Productlijn", sbg_options, index=sbg_options.index(cur_sbg))
+                with e_col2:
+                    e_vol = st.number_input("Volume (m³)", value=float(current_meta["volume_m3"]), step=100.0)
+                    e_flow = st.number_input("Debiet (m³/h)", value=float(current_meta["flow_m3_h"]), step=25.0)
+                    e_temp = st.number_input("Temperatuur (°C)", value=float(current_meta["temp_c"]), step=0.5)
+
+                e_ph = st.number_input("Nominale pH", value=float(current_meta["ph_nominal"]), step=0.05)
+
+                if st.form_submit_button("Wijzigingen Opslaan"):
+                    client_data["installations"][selected_inst].update({
+                        "inst_type": e_type,
+                        "temp_regime": e_regime,
+                        "sbg_product": e_sbg,
+                        "volume_m3": e_vol,
+                        "flow_m3_h": e_flow,
+                        "temp_c": e_temp,
+                        "ph_nominal": e_ph
+                    })
+                    st.success("Installatieparameters bijgewerkt.")
+                    st.rerun()
