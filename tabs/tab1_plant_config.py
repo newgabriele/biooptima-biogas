@@ -1,108 +1,201 @@
+# tabs/tab1_plant_config.py
 import streamlit as st
+import pandas as pd
+import json
+import os
+from formulas import PlantProfile
 
-def render():
-    st.subheader("⚙️ Tab 1: Plant Configuratie & Asset Beheer")
-    st.markdown("Centraal beheer van industriële CSTR-installaties, reactorvolumeflows en de actieve dual-valence additiefsamenstelling per werf.")
+DATA_FILE = "clients_db.json"
 
-    st.info("💡 **Enterprise Asset Management:** Selecteer een bestaande installatie of voeg een nieuwe werf toe. Alle instellingen worden direct gekoppeld aan de actieve plant.")
-
-    # Initialiseer de installatielijst in session_state
-    if "installations_dict" not in st.session_state:
-        st.session_state.installations_dict = {
-            "Corte Pila (Italië) - 1MW CSTR": {
-                "flow": 500.0,
-                "volume": 3500.0,
-                "temp": 38.5,
-                "fe2o3": 35,
-                "feo": 35,
-                "target_h2s": 80,
-                "status": "Actief (Optimized)"
-            },
-            "BioEnergy Noord (Nederland) - 0.8MW": {
-                "flow": 400.0,
-                "volume": 2800.0,
-                "temp": 38.0,
-                "fe2o3": 35,
-                "feo": 35,
-                "target_h2s": 90,
-                "status": "Actief (Standard)"
-            },
-            "Biogás Sur (Frankrijk) - 1.2MW": {
-                "flow": 600.0,
-                "volume": 4200.0,
-                "temp": 39.0,
-                "fe2o3": 40,
-                "target_h2s": 75,
-                "status": "In Kalibratie"
+def load_clients_db():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "SwissBiogas AG": {
+            "installations": {
+                "Corte Pila (1MW CSTR)": {
+                    "volume_m3": 2500.0,
+                    "flow_m3_h": 500.0,
+                    "inst_type": "agro",
+                    "temp_regime": "Mesofiel",
+                    "sbg_product": "SBG Agro",
+                    "ph_nominal": 7.65,
+                    "temp_c": 38.5,
+                    "biogas_price_per_m3": 0.68
+                },
+                "Installatie 2 (Noord-Italië)": {
+                    "volume_m3": 1800.0,
+                    "flow_m3_h": 350.0,
+                    "inst_type": "agro",
+                    "temp_regime": "Mesofiel",
+                    "sbg_product": "SBG Agro",
+                    "ph_nominal": 7.50,
+                    "temp_c": 38.5,
+                    "biogas_price_per_m3": 0.68
+                }
             }
         }
+    }
 
-    if "active_plant" not in st.session_state:
-        st.session_state.active_plant = list(st.session_state.installations_dict.keys())[0]
+def save_clients_db(db):
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(db, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        st.error(f"Fout bij opslaan naar bestand: {e}")
 
-    col_sel1, col_sel2 = st.columns([2, 1])
+def render():
+    st.subheader("🏢 Klanten- & Installatiebeheer (Tab 1)")
+    st.markdown(
+        "Beheer hieronder jouw portefeuille in een **bewerkbare tabel**. "
+        "Wanneer je het **Regime** wijzigt naar Thermofiel of Mesofiel en op opslaan klikt, "
+        "schakelt de temperatuur direct mee naar 52.0°C of 38.5°C."
+    )
+
+    if "clients_db" not in st.session_state:
+        st.session_state.clients_db = load_clients_db()
+
+    flat_data = []
+    for client_name, client_data in st.session_state.clients_db.items():
+        for inst_name, inst_meta in client_data.get("installations", {}).items():
+            regime = inst_meta.get("temp_regime", "Mesofiel")
+            default_temp = 38.5 if regime == "Mesofiel" else 52.0
+            flat_data.append({
+                "Klant": client_name,
+                "Installatie": inst_name,
+                "Type": inst_meta.get("inst_type", "agro"),
+                "Volume (m³)": inst_meta.get("volume_m3", 2500.0),
+                "Debiet (m³/h)": inst_meta.get("flow_m3_h", 500.0),
+                "Regime": regime,
+                "Temperatuur (°C)": inst_meta.get("temp_c", default_temp),
+                "SBG Product": inst_meta.get("sbg_product", "SBG Agro"),
+                "pH": inst_meta.get("ph_nominal", 7.65)
+            })
+
+    df_inst = pd.DataFrame(flat_data)
+    if df_inst.empty:
+        df_inst = pd.DataFrame([{
+            "Klant": "Nieuwe Klant",
+            "Installatie": "Nieuwe Installatie",
+            "Type": "agro",
+            "Volume (m³)": 2500.0,
+            "Debiet (m³/h)": 500.0,
+            "Regime": "Mesofiel",
+            "Temperatuur (°C)": 38.5,
+            "SBG Product": "SBG Agro",
+            "pH": 7.65
+        }])
+
+    st.markdown("### 📊 Portefeuille Overzicht & Mutatietabel")
     
-    with col_sel1:
-        selected_plant = st.selectbox(
-            "🏭 Selecteer Actieve Werf / Installatie",
-            list(st.session_state.installations_dict.keys()),
-            index=list(st.session_state.installations_dict.keys()).index(st.session_state.active_plant)
-        )
-        st.session_state.active_plant = selected_plant
+    edited_df = st.data_editor(
+        df_inst, 
+        use_container_width=True, 
+        height=350, 
+        key="editable_installations_grid",
+        num_rows="dynamic",
+        column_config={
+            "Klant": st.column_config.TextColumn("Klant / Eigenaar", required=True),
+            "Installatie": st.column_config.TextColumn("Naam Installatie", required=True),
+            "Type": st.column_config.SelectboxColumn("Type", options=["agro", "covergisting", "industrie"], required=True),
+            "Regime": st.column_config.SelectboxColumn("Regime", options=["Mesofiel", "Thermofiel"], required=True),
+            "SBG Product": st.column_config.SelectboxColumn("SBG Product", options=["SBG Agro", "SBG Energo", "SBG Industrial"], required=True),
+            "Volume (m³)": st.column_config.NumberColumn(format="%.1f", step=100.0),
+            "Debiet (m³/h)": st.column_config.NumberColumn(format="%.1f", step=25.0),
+            "pH": st.column_config.NumberColumn(format="%.2f", step=0.05),
+            "Temperatuur (°C)": st.column_config.NumberColumn(format="%.1f", step=0.5, help="Mesofiel = 38.5°C, Thermofiel = 52.0°C")
+        }
+    )
 
-    with col_sel2:
-        with st.expander("➕ Nieuwe Werf Toevoegen"):
-            new_plant_name = st.text_input("Naam & Capaciteit (bijv. BioPlant DE - 1MW)")
-            if st.button("Voeg Toe"):
-                if new_plant_name and new_plant_name not in st.session_state.installations_dict:
-                    st.session_state.installations_dict[new_plant_name] = {
-                        "flow": 500.0,
-                        "volume": 3500.0,
-                        "temp": 38.5,
-                        "fe2o3": 35,
-                        "feo": 35,
-                        "target_h2s": 80,
-                        "status": "Nieuw"
-                    }
-                    st.session_state.active_plant = new_plant_name
-                    st.success(f"Werf '{new_plant_name}' toegevoegd!")
-                    st.rerun()
+    col_btn1, col_btn2 = st.columns([1, 2])
+    with col_btn1:
+        save_clicked = st.button("💾 Wijzigingen Opslaan & Doorvoeren", type="primary")
 
-    # Haal de data op van de momenteel geselecteerde plant
-    plant_data = st.session_state.installations_dict[selected_plant]
+    if save_clicked:
+        new_clients_db = {}
+        for _, row in edited_df.iterrows():
+            c_name = str(row["Klant"]).strip()
+            i_name = str(row["Installatie"]).strip()
+            
+            if not c_name or c_name == "nan" or not i_name or i_name == "nan":
+                continue
+            
+            new_regime = row["Regime"]
+            current_temp = row["Temperatuur (°C)"]
+            
+            # Zoek het vorige regime op in de bestaande database
+            old_regime = "Mesofiel"
+            old_meta = {}
+            if c_name in st.session_state.clients_db:
+                if i_name in st.session_state.clients_db[c_name].get("installations", {}):
+                    old_meta = st.session_state.clients_db[c_name]["installations"][i_name]
+                    old_regime = old_meta.get("temp_regime", "Mesofiel")
+            
+            # Bepaal de standaardtemperaturen
+            default_old = 38.5 if old_regime == "Mesofiel" else 52.0
+            default_new = 38.5 if new_regime == "Mesofiel" else 52.0
+            
+            # LOGICA: Als het regime is gewijzigd OF de temperatuur stond nog op de oude standaardwaarde, 
+            # pas dan automatisch de temperatuur aan naar de nieuwe standaard. 
+            # Anders blijft de handmatig ingevoerde temperatuur behouden.
+            if new_regime != old_regime:
+                target_temp = default_new
+            else:
+                curr_float = float(current_temp) if not pd.isna(current_temp) else default_new
+                # Als de gebruiker handmatig de temperatuur op de oude standaard liet staan terwijl regime gelijk is
+                if curr_float == default_old and new_regime != old_regime:
+                    target_temp = default_new
+                else:
+                    target_temp = curr_float
+            
+            old_price = old_meta.get("biogas_price_per_m3", 0.68)
 
-    st.markdown("---")
+            if c_name not in new_clients_db:
+                new_clients_db[c_name] = {"installations": {}}
 
-    col1, col2 = st.columns(2)
+            new_clients_db[c_name]["installations"][i_name] = {
+                "inst_type": row["Type"],
+                "volume_m3": float(row["Volume (m³)"]) if not pd.isna(row["Volume (m³)"]) else 2500.0,
+                "flow_m3_h": float(row["Debiet (m³/h)"]) if not pd.isna(row["Debiet (m³/h)"]) else 500.0,
+                "temp_regime": new_regime,
+                "temp_c": target_temp,
+                "sbg_product": row["SBG Product"],
+                "ph_nominal": float(row["pH"]) if not pd.isna(row["pH"]) else 7.65,
+                "biogas_price_per_m3": old_price
+            }
 
-    with col1:
-        st.markdown("### 🏭 Reactor & Procesparameters")
-        biogas_flow = st.number_input("Nominaal Biogasdebiet (m³/h)", value=float(plant_data["flow"]), step=10.0, key="cfg_flow")
-        reactor_volume = st.number_input("Reactor Volume (m³)", value=float(plant_data["volume"]), step=50.0, key="cfg_vol")
-        reactor_temp = st.number_input("Verteringstemperatuur (°C)", value=float(plant_data["temp"]), step=0.5, format="%.1f", key="cfg_temp")
-        reactor_type = st.selectbox("Type Verter", ["CSTR (Continu Stirred-Tank Reactor)", "Plug Flow Reactor", "Upflow Anaerobic Sludge Blanket (UASB)"])
-
-    with col2:
-        st.markdown("### 🧪 Additief & Chemie Specificatie")
-        fe2o3_pct = st.slider("Fe₂O₃ Percentage (%)", 0, 100, int(plant_data["fe2o3"]), key="cfg_fe2o3")
-        feo_pct = st.slider("FeO Percentage (%)", 0, 100, int(plant_data["feo"]), key="cfg_feo")
+        st.session_state.clients_db = new_clients_db
+        save_clients_db(new_clients_db)
         
-        total_active = fe2o3_pct + feo_pct
-        st.markdown(f"**Totaal Actieve Componenten:** {total_active}%")
-        if total_active != 70:
-            st.warning("⚠️ Standaard BioOptima formulering adviseert een gebalanceerde 35%/35% dual-valence mix.")
-        else:
-            st.success("✅ Dual-valence balans optimaal ingesteld (35% Fe₂O₃ / 35% FeO).")
+        first_c = list(new_clients_db.keys())[0]
+        first_i = list(new_clients_db[first_c]["installations"].keys())[0]
+        meta = new_clients_db[first_c]["installations"][first_i]
+        
+        # Geef de actieve installatie mee inclusief de correcte temperatuur voor formules.py
+        st.session_state.active_plant = PlantProfile(
+            name=f"{first_c} - {first_i}",
+            inst_type=meta["inst_type"],
+            volume_m3=meta["volume_m3"],
+            biogas_flow_m3_h=meta["flow_m3_h"],
+            ph_nominal=meta["ph_nominal"],
+            temp_c=meta["temp_c"],
+            biogas_price_per_m3=meta["biogas_price_per_m3"]
+        )
 
-        target_h2s = st.number_input("Doel H₂S vloeistoffase (ppm)", value=int(plant_data["target_h2s"]), min_value=20, max_value=200, key="cfg_h2s")
+        st.success("✅ Wijzigingen opgeslagen! Temperatuur is succesvol aangepast aan het regime en doorgevoerd in de formules.")
+        st.rerun()
 
     st.markdown("---")
-    if st.button("💾 Opslaan & Validatie Configuratie voor deze Werf"):
-        # Sla wijzigingen direct op in het dictionary van deze specifieke plant
-        plant_data["flow"] = biogas_flow
-        plant_data["volume"] = reactor_volume
-        plant_data["temp"] = reactor_temp
-        plant_data["fe2o3"] = fe2o3_pct
-        plant_data["feo"] = feo_pct
-        plant_data["target_h2s"] = target_h2s
-        st.success(f"Configuratie voor **{selected_plant}** succesvol opgeslagen en doorgevoerd naar het kinetisch model!")
+    st.markdown("### 🎯 Huidige Actieve Selectie voor Berekeningen")
+    if "active_plant" in st.session_state and st.session_state.active_plant:
+        p = st.session_state.active_plant
+        if hasattr(p, "name"):
+            st.info(f"🟢 **Actieve Installatie:** `{p.name}` — Debiet: **{p.biogas_flow_m3_h} m³/h** | Volume: **{p.volume_m3} m³** | Temperatuur: **{p.temp_c}°C**")
+        else:
+            st.info(f"🟢 **Actieve Installatie:** `{p}`")
+    else:
+        st.warning("⚠️ Klik op 'Wijzigingen Opslaan & Doorvoeren' om een actieve installatie te activeren.")

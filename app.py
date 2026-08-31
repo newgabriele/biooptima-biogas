@@ -1,178 +1,137 @@
-# app.py - BioOptima 360° Hoofdapplicatie (Digital Twin & Dynamic Dosing)
+# app.py
 import streamlit as st
+import json
 import os
-import sys
+import importlib
+import pandas as pd
+from formulas import PlantProfile
 
-# Zorg ervoor dat Python de map correct herkent
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+st.set_page_config(
+    page_title="BioOptima 360° - Biogas Optimalisatie",
+    page_icon="♻️",
+    layout="wide"
+)
 
-# Expliciete en veilige imports van alle tabbladen (1 t/m 13)
-try:
-    from tabs import tab1_plant_config as t1
-except ImportError:
-    t1 = None
-
-try:
-    from tabs import tab2_kinetics as t2
-except ImportError:
-    t2 = None
-
-try:
-    from tabs import tab3_operator as t3
-except ImportError:
-    t3 = None
-
-try:
-    from tabs import tab4_management as t4
-except ImportError:
-    t4 = None
-
-try:
-    from tabs import tab5_analytics as t5
-except ImportError:
-    t5 = None
-
-try:
-    from tabs import tab6_substrates as t6
-except ImportError:
-    t6 = None
-
-try:
-    from tabs import tab7_installations as t7
-except ImportError:
-    t7 = None
-
-try:
-    from tabs import tab8_ai_calibration as t8
-except ImportError:
-    t8 = None
-
-try:
-    from tabs import tab9_reports as t9
-except ImportError:
-    t9 = None
-
-try:
-    from tabs import tab10_changelog as t10
-except ImportError:
-    t10 = None
-
-try:
-    from tabs import tab11_benchmark as t11
-except ImportError:
-    t11 = None
-
-try:
-    from tabs import tab12_questions as t12
-except ImportError:
-    t12 = None
-
-try:
-    from tabs import tab13_sustainability as t13
-except ImportError:
-    t13 = None
-
+DATA_FILE = "clients_db.json"
 
 def main():
-    st.set_page_config(
-        page_title="BioOptima 360° | Industrial Biogas Digital Twin",
-        page_icon="♻️",
-        layout="wide"
-    )
+    # 1. Laad de klanten- en installatiedatabase permanent vanuit JSON
+    if "clients_db" not in st.session_state:
+        if os.path.exists(DATA_FILE):
+            try:
+                with open(DATA_FILE, "r", encoding="utf-8") as f:
+                    st.session_state.clients_db = json.load(f)
+            except Exception:
+                st.session_state.clients_db = {}
+        else:
+            st.session_state.clients_db = {
+                "SwissBiogas AG": {
+                    "installations": {
+                        "Corte Pila (1MW CSTR)": {
+                            "volume_m3": 2500.0,
+                            "flow_m3_h": 500.0,
+                            "inst_type": "agro",
+                            "temp_regime": "Mesofiel",
+                            "sbg_product": "SBG Agro",
+                            "ph_nominal": 7.65,
+                            "temp_c": 38.5,
+                            "biogas_price_per_m3": 0.68
+                        }
+                    }
+                }
+            }
 
-    # --- CENTRALE INITIALISATIE SESSION STATE ---
-    if "substrates_db" not in st.session_state:
-        st.session_state.substrates_db = {
-            "runderdrijfmest": {"ts_pct": 0.09, "vs_pct": 0.75, "s_g_per_kg_ts": 4.0, "biogas_m3_per_ton_odm": 350.0, "price_per_ton": -5.0, "f_fast": 0.2, "f_med": 0.5, "f_slow": 0.3, "vfa_risk": 0.5},
-            "maissilage": {"ts_pct": 0.33, "vs_pct": 0.95, "s_g_per_kg_ts": 1.5, "biogas_m3_per_ton_odm": 620.0, "price_per_ton": 48.0, "f_fast": 0.5, "f_med": 0.4, "f_slow": 0.1, "vfa_risk": 2.5},
-            "kippenmest": {"ts_pct": 0.55, "vs_pct": 0.80, "s_g_per_kg_ts": 12.0, "biogas_m3_per_ton_odm": 480.0, "price_per_ton": 12.0, "f_fast": 0.6, "f_med": 0.3, "f_slow": 0.1, "vfa_risk": 4.0},
-            "melasse": {"ts_pct": 0.75, "vs_pct": 0.98, "s_g_per_kg_ts": 0.8, "biogas_m3_per_ton_odm": 750.0, "price_per_ton": 120.0, "f_fast": 0.9, "f_med": 0.1, "f_slow": 0.0, "vfa_risk": 6.0}
-        }
+    # 2. Initialiseer actieve plant
+    if "active_plant" not in st.session_state or not st.session_state.active_plant:
+        try:
+            first_c = list(st.session_state.clients_db.keys())[0]
+            first_i = list(st.session_state.clients_db[first_c]["installations"].keys())[0]
+            meta = st.session_state.clients_db[first_c]["installations"][first_i]
+            st.session_state.active_plant = PlantProfile(
+                name=f"{first_c} - {first_i}",
+                inst_type=meta["inst_type"],
+                volume_m3=meta["volume_m3"],
+                biogas_flow_m3_h=meta["flow_m3_h"],
+                ph_nominal=meta["ph_nominal"],
+                temp_c=meta["temp_c"],
+                biogas_price_per_m3=meta["biogas_price_per_m3"]
+            )
+        except Exception:
+            st.session_state.active_plant = PlantProfile(
+                name="Corte Pila (1MW CSTR)",
+                inst_type="agro",
+                volume_m3=2500.0,
+                biogas_flow_m3_h=500.0,
+                ph_nominal=7.65,
+                temp_c=38.5,
+                biogas_price_per_m3=0.68
+            )
 
-    st.sidebar.title("🌿 BioOptima 360°")
-    st.sidebar.markdown("**Digital Twin & Dynamic Dosing**")
+    # 3. Dynamisch inladen van alle tab-bestanden in de map 'tabs'
+    tabs_modules = {}
+    tabs_dir = "tabs"
+    if os.path.exists(tabs_dir):
+        for fname in sorted(os.listdir(tabs_dir)):
+            if fname.endswith(".py") and fname.startswith("tab"):
+                num_str = ''.join(filter(str.isdigit, fname.split("_")[0]))
+                if num_str:
+                    tab_num = int(num_str)
+                    module_name = fname[:-3]
+                    try:
+                        mod = importlib.import_module(f"tabs.{module_name}")
+                        tabs_modules[tab_num] = mod
+                    except Exception:
+                        pass
+
+    # Koppel Tab 1 expliciet aan onze nieuwe beheer-module
+    try:
+        from tabs import tab1_plant_config
+        tabs_modules[1] = tab1_plant_config
+    except Exception:
+        pass
+
+    # 4. Correcte benamingen van de zijbalk conform Versie 5
+    tab_labels = {
+        1: "Tab 1: Klanten & Installatiebeheer",
+        2: "Tab 2: Kinetica & Systeem",
+        3: "Tab 3: Operator",
+        4: "Tab 4: Economie & ROI",
+        5: "Tab 5: Optimalisatie",
+        6: "Tab 6: Simulatie & Optimalisaties",
+        7: "Tab 7: Monitoring",
+        8: "Tab 8: Installaties",
+        9: "Tab 9: Rapportage",
+        10: "Tab 10: Extra 2",
+        11: "Tab 11: Extra 3",
+        12: "Tab 12: Register & Ideeën",
+        13: "Tab 13: RED Duurzaamheid Programma"
+    }
+
+    menu_options = []
+    mapping_options = {}
+    for i in range(1, 14):
+        label = tab_labels.get(i, f"Tab {i}")
+        menu_options.append(label)
+        mapping_options[label] = i
+
+    st.sidebar.title("🧭 Navigatie")
+    selected_label = st.sidebar.radio("Ga naar Tabblad", menu_options, key="sidebar_tab_navigation")
+
     st.sidebar.markdown("---")
-
-    menu_options = [
-        "🏠 Master Dashboard",
-        "👤 Klanten & Installatie Beheer",
-        "⚙️ Tab 1: Plant Configuratie",
-        "🧪 Tab 2: Kinetisch Model & Basisdoses",
-        "👷 Tab 3: Operator & 20kg Bag Dosing",
-        "📈 Tab 4: Directie & Financiële ROI",
-        "📊 Tab 5: Analytics & Wobbe-Index",
-        "🌾 Tab 6: Substraten & Marktprijzen",
-        "🏭 Tab 7: Installaties & Werfbeheer",
-        "🔬 Tab 8: AI-kalibratie & Sensor Validatie",
-        "📋 Tab 9: Rapportage & Logs",
-        "📋 Tab 10: Systeem Changelog & Release",
-        "⚙️ Tab 11: Benchmark & Valorisatie",
-        "💡 Tab 12: Intelligente Vragen & Registratie",
-        "🇪🇺 Tab 13: RED II Duurzaamheid & ESG"
-    ]
-
-    choice = st.sidebar.radio("Navigatie", menu_options)
-
-    current_plant = st.session_state.get('active_plant', 'Corte Pila (Italië) - 1MW CSTR')
-
-    st.sidebar.markdown("---")
-    st.sidebar.info(
-        f"🏭 **Actieve Werf:**\n{current_plant}\n\n"
-        "⚙️ **Plant Status:** Actief\n"
-        "🔹 **Additief:** Fe₂O₃/FeO (35%/35%)\n"
-        "🔹 **Versie:** v2.1.0 (Augustus 2026)"
-    )
-
-    # Routering op basis van menukeuze
-    if choice == "🏠 Master Dashboard":
-        st.title("🏠 BioOptima 360° — Master Dashboard")
-        st.markdown("Centraal besturingsplatform voor industriële anaerobe vergisting en biomethaan optimalisatie.")
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric(label="Actief Biogas Debiet", value="500 m³/h", delta="+5.6% TalTech Yield")
-        with col2:
-            st.metric(label="H₂S Vloeistoffase Doel", value="< 100 ppm", delta="-85% Ontzwaveling")
-        with col3:
-            st.metric(label="Prediktieve Nauwkeurigheid", value="95.4%", delta="ML Engine Active")
-
-    elif choice == "👤 Klanten & Installatie Beheer":
-        st.title("👤 Klanten & Gebruikersbeheer")
-        st.markdown("Overzicht van actieve klantdossiers, installaties en toegangsrechten.")
-
-    elif "Tab 1:" in choice:
-        render_tab(t1, "Tab 1: Plant Configuratie & Systeemparameters")
-    elif "Tab 2:" in choice:
-        render_tab(t2, "Tab 2: Kinetisch Model & Gasexpansie")
-    elif "Tab 3:" in choice:
-        render_tab(t3, "Tab 3: Operator Werkinstructies & 20kg Bag Dosing")
-    elif "Tab 4:" in choice:
-        render_tab(t4, "Tab 4: Directie & Financiële ROI")
-    elif "Tab 5:" in choice:
-        render_tab(t5, "Tab 5: Analytics, Wobbe-Index & Vochtbalans")
-    elif "Tab 6:" in choice:
-        render_tab(t6, "Tab 6: Substraten & Marktprijzen")
-    elif "Tab 7:" in choice:
-        render_tab(t7, "Tab 7: Installaties & Werfbeheer")
-    elif "Tab 8:" in choice:
-        render_tab(t8, "Tab 8: AI-kalibratie & Sensor Validatie")
-    elif "Tab 9:" in choice:
-        render_tab(t9, "Tab 9: Rapportage & Systeem Logs")
-    elif "Tab 10:" in choice:
-        render_tab(t10, "Tab 10: Systeem Changelog & Release Historie")
-    elif "Tab 11:" in choice:
-        render_tab(t11, "Tab 11: Benchmark & Valorisatie Matrix")
-    elif "Tab 12:" in choice:
-        render_tab(t12, "Tab 12: Intelligente Vragen & Registratie")
-    elif "Tab 13:" in choice:
-        render_tab(t13, "Tab 13: RED II Duurzaamheid & ESG")
-
-def render_tab(module, title):
-    st.title(title)
-    if module is not None and hasattr(module, "render"):
-        module.render()
+    st.sidebar.markdown("### 🟢 Actieve Plant")
+    if hasattr(st.session_state.active_plant, "name"):
+        st.sidebar.info(f"**{st.session_state.active_plant.name}**")
     else:
-        st.error(f"⚠️ Het bijbehorende tab-bestand kon niet worden geladen of mist de `render()` functie.")
+        st.sidebar.info(f"**{st.session_state.active_plant}**")
+
+    # 5. Render het geselecteerde tabblad vanuit de echte module
+    selected_num = mapping_options.get(selected_label, 1)
+    
+    if selected_num in tabs_modules and hasattr(tabs_modules[selected_num], "render"):
+        tabs_modules[selected_num].render()
+    else:
+        st.subheader(selected_label)
+        st.warning(f"⚠️ Voor dit tabblad kon geen gekoppeld Python-bestand in de map 'tabs' worden gevonden.")
 
 if __name__ == "__main__":
     main()
