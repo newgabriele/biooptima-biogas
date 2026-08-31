@@ -12,17 +12,17 @@
                 "ph_nominal": 7.65,
                 "recipe": [
                     {
-                        "Substraat": "Maïskuil (Hoofdsubstraat)",
-                        "Tonnage (ton/dag)": 55.0,
-                        "DS (%)": 35.0,
-                        "oDS (% oDS)": 92.0,
-                        "Biogaspotentieel (m³/ton)": 210.0
+                        "Substraat": "Maize silage",
+                        "Tonnage (ton/dag)": 60.0,
+                        "DS (%)": 14.0,
+                        "DM / oDS (%)": 90.0,
+                        "Biogaspotentieel (m³/ton)": 200.0
                     },
                     {
-                        "Substraat": "Recirculaat (Digestaat)",
-                        "Tonnage (ton/dag)": 5.0,
+                        "Substraat": "Recirculaat / Digestaat",
+                        "Tonnage (ton/dag)": 1.0,
                         "DS (%)": 5.0,
-                        "oDS (% oDS)": 60.0,
+                        "DM / oDS (%)": 60.0,
                         "Biogaspotentieel (m³/ton)": 0.0
                     }
                 ]
