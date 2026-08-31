@@ -1258,3 +1258,47 @@ def process_imported_plant_data(df: pd.DataFrame) -> dict:
             summary["avg_ph"] = float(df[col].mean(skipna=True))
             
     return summary
+def calculate_recipe_totals(df):
+    """
+    Berekent de totale tonnages, gewogen drogestof (DS), organische drogestof (oDS) 
+    en de totale verwachte biogasproductie (m³/dag) uit het substraatrecept.
+    """
+    if df.empty or "Tonnage (ton/dag)" not in df.columns:
+        return 0.0, 0.0, 0.0, 0.0
+
+    total_tonnage = df["Tonnage (ton/dag)"].sum()
+    if total_tonnage <= 0:
+        return 0.0, 0.0, 0.0, 0.0
+    
+    weighted_ds = (df["Tonnage (ton/dag)"] * df["DS (%)"]).sum() / total_tonnage
+    weighted_ods = (df["Tonnage (ton/dag)"] * df["oDS (% oDS)"]).sum() / total_tonnage
+    total_biogas = (df["Tonnage (ton/dag)"] * df["Biogaspotentieel (m³/ton)"]).sum()
+    
+    return total_tonnage, weighted_ds, weighted_ods, total_biogas
+
+def calculate_organic_loading_rate(total_tonnage, ds_pct, ods_pct, volume_m3):
+    """
+    Berekent de organische belasting in kg oDS / m³·dag.
+    """
+    if volume_m3 <= 0 or total_tonnage <= 0:
+        return 0.0
+    
+    kg_ods_day = total_tonnage * (ds_pct / 100.0) * (ods_pct / 100.0) * 1000.0
+    return kg_ods_day / volume_m3
+
+def calculate_h2s_dosages(flow_m3_h, h2s_raw_ppm, temp_c, fe_ratio, sbg_product):
+    """
+    Berekent de H2S vracht, benodigd actief Fe en de SBG additiefdosering.
+    """
+    product_factors = {"SBG agro": 1.0, "SBG energo": 0.90, "SBG industrial": 0.80}
+    active_factor = product_factors.get(sbg_product, 1.0)
+
+    daily_biogas = flow_m3_h * 24.0
+    molar_volume_t = 0.0224 * ((temp_c + 273.15) / 273.15)
+    mol_h2s = (daily_biogas * (h2s_raw_ppm / 1_000_000.0)) / molar_volume_t
+    
+    mass_h2s_kg = mol_h2s * 34.08 / 1000.0
+    mass_fe_needed = mol_h2s * fe_ratio * 55.845 / 1000.0
+    total_dose = mass_fe_needed * active_factor * 2.5
+
+    return mass_h2s_kg, mass_fe_needed, total_dose

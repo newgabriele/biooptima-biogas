@@ -3,13 +3,29 @@
         "installations": {
             "Merlara": {
                 "inst_type": "agro",
-                "volume_m3": 2500.0,
                 "flow_m3_h": 500.0,
-                "temp_regime": "Thermofiel",
-                "temp_c": 52.0,
-                "sbg_product": "SBG Agro",
+                "volume_m3": 4000.0,
+                "fermenter_setup": "2 Reactors (Primair + Secundair / Envitec Standaard)",
+                "vol_primary": 2000.0,
+                "vol_secondary": 2000.0,
+                "temp_c": 38.5,
                 "ph_nominal": 7.65,
-                "biogas_price_per_m3": 0.68
+                "recipe": [
+                    {
+                        "Substraat": "Maïskuil (Hoofdsubstraat)",
+                        "Tonnage (ton/dag)": 55.0,
+                        "DS (%)": 35.0,
+                        "oDS (% oDS)": 92.0,
+                        "Biogaspotentieel (m³/ton)": 210.0
+                    },
+                    {
+                        "Substraat": "Recirculaat (Digestaat)",
+                        "Tonnage (ton/dag)": 5.0,
+                        "DS (%)": 5.0,
+                        "oDS (% oDS)": 60.0,
+                        "Biogaspotentieel (m³/ton)": 0.0
+                    }
+                ]
             },
             "Biobio": {
                 "inst_type": "agro",
@@ -30,6 +46,43 @@
                 "sbg_product": "SBG Energo",
                 "ph_nominal": 7.7,
                 "biogas_price_per_m3": 0.68
+            }
+        }
+    },
+    "Sesa ": {
+        "installations": {
+            "Da.Ma": {
+                "inst_type": "covergister",
+                "flow_m3_h": 500.0,
+                "volume_m3": 4000.0,
+                "fermenter_setup": "1 Reactor (Enkelvoudig)",
+                "vol_primary": 4000.0,
+                "vol_secondary": 0.0,
+                "temp_c": 38.5,
+                "ph_nominal": 7.65,
+                "recipe": [
+                    {
+                        "Substraat": "Maïskuil (Hoofdsubstraat)",
+                        "Tonnage (ton/dag)": 45.0,
+                        "DS (%)": 35.0,
+                        "oDS (% oDS)": 92.0,
+                        "Biogaspotentieel (m³/ton)": 210.0
+                    },
+                    {
+                        "Substraat": "Kippenmest",
+                        "Tonnage (ton/dag)": 2.0,
+                        "DS (%)": 85.0,
+                        "oDS (% oDS)": 98.0,
+                        "Biogaspotentieel (m³/ton)": 650.0
+                    },
+                    {
+                        "Substraat": "Recirculaat (Digestaat)",
+                        "Tonnage (ton/dag)": 10.0,
+                        "DS (%)": 5.0,
+                        "oDS (% oDS)": 60.0,
+                        "Biogaspotentieel (m³/ton)": 0.0
+                    }
+                ]
             }
         }
     }
