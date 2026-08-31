@@ -15,7 +15,6 @@ st.set_page_config(
 DATA_FILE = "clients_db.json"
 
 def main():
-    # 1. Laad de klanten- en installatiedatabase permanent vanuit JSON
     if "clients_db" not in st.session_state:
         if os.path.exists(DATA_FILE):
             try:
@@ -41,7 +40,6 @@ def main():
                 }
             }
 
-    # 2. Initialiseer actieve plant
     if "active_plant" not in st.session_state or not st.session_state.active_plant:
         try:
             first_c = list(st.session_state.clients_db.keys())[0]
@@ -67,7 +65,7 @@ def main():
                 biogas_price_per_m3=0.68
             )
 
-    # 3. Dynamisch inladen van alle tab-bestanden in de map 'tabs'
+    # Automatisch dynamisch inladen van ALLE tabbladen uit de 'tabs' map
     tabs_modules = {}
     tabs_dir = "tabs"
     if os.path.exists(tabs_dir):
@@ -83,22 +81,14 @@ def main():
                     except Exception:
                         pass
 
-    # Koppel Tab 1 expliciet aan onze nieuwe beheer-module
-    try:
-        from tabs import tab1_plant_config
-        tabs_modules[1] = tab1_plant_config
-    except Exception:
-        pass
-
-    # 4. Correcte benamingen van de zijbalk conform Versie 5
     tab_labels = {
         1: "Tab 1: Klanten & Installatiebeheer",
-        2: "Tab 2: Kinetica & Systeem",
+        2: "Tab 2: Kinetica, H₂S Systeem & Kantoorplanning",
         3: "Tab 3: Operator",
         4: "Tab 4: Economie & ROI",
         5: "Tab 5: Optimalisatie",
         6: "Tab 6: Simulatie & Optimalisaties",
-        7: "Tab 7: Monitoring",
+        7: "Tab 7: Installaties & Data Import",
         8: "Tab 8: Installaties",
         9: "Tab 9: Rapportage",
         10: "Tab 10: Extra 2",
@@ -124,14 +114,14 @@ def main():
     else:
         st.sidebar.info(f"**{st.session_state.active_plant}**")
 
-    # 5. Render het geselecteerde tabblad vanuit de echte module
     selected_num = mapping_options.get(selected_label, 1)
-    
+
+    # Render het geselecteerde tabblad indien de module geladen is
     if selected_num in tabs_modules and hasattr(tabs_modules[selected_num], "render"):
         tabs_modules[selected_num].render()
     else:
         st.subheader(selected_label)
-        st.warning(f"⚠️ Voor dit tabblad kon geen gekoppeld Python-bestand in de map 'tabs' worden gevonden.")
+        st.info(f"💡 Voor dit tabblad ('Tab {selected_num}') is nog geen Python-bestand met een `render()` functie gevonden in de map 'tabs'.")
 
 if __name__ == "__main__":
     main()

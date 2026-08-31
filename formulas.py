@@ -1227,3 +1227,34 @@ def calculate_substrate_sensitivity_analysis(
             })
             
     return pd.DataFrame(results)
+def process_imported_plant_data(df: pd.DataFrame) -> dict:
+    """
+    Verwerkt en analyseert geüploadde plantdata (CSV/Excel).
+    Retourneert een gestructureerd dictionary met KPI's en opgeschoonde data
+    voor gebruik in alle andere tabbladen.
+    """
+    if df is None or df.empty:
+        return {"status": "empty"}
+    
+    # Standaardiseer kolomnamen naar lowercase zonder spaties voor betrouwbare herkenning
+    df.columns = [str(c).strip().lower() for c in df.columns]
+    
+    summary = {
+        "status": "success",
+        "total_rows": len(df),
+        "columns": list(df.columns),
+        "raw_data": df
+    }
+    
+    # Automatische detectie van veelvoorkomende biogas-parameters indien aanwezig in de kolommen
+    for col in df.columns:
+        if "h2s" in col or "sulfide" in col:
+            summary["avg_h2s"] = float(df[col].mean(skipna=True))
+        if "flow" in col or "debiet" in col or "gas" in col:
+            summary["avg_flow"] = float(df[col].mean(skipna=True))
+        if "temp" in col or "temperatuur" in col:
+            summary["avg_temp"] = float(df[col].mean(skipna=True))
+        if "ph" in col:
+            summary["avg_ph"] = float(df[col].mean(skipna=True))
+            
+    return summary

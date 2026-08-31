@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+from formulas import process_imported_plant_data
 
 DATA_FILE = "clients_db.json"
 
@@ -16,18 +17,43 @@ def load_clients_db():
     return {}
 
 def render():
-    st.subheader("⚙️ Tab 7: Installaties & Predictieve Data Nauwkeurigheid")
+    st.subheader("⚙️ Tab 7: Installaties, Data Import & Predictieve Nauwkeurigheid")
     st.markdown(
-        "Dit dashboard toont het operationele overzicht van alle actieve installaties, "
-        "de **predictieve data nauwkeurigheid** van de ingevoerde parameters voor betrouwbare simulaties, "
-        "en de operationele veiligheidsnorm zoals de **H₂S bovengrens (< 100 ppm)**."
+        "Beheer hier uw installaties, upload externe meetdata (sensorlogging, lab-uitslagen, VFA/TAC) "
+        "en bekijk de predictieve data nauwkeurigheid. **Belangrijk:** Geïmporteerde meetdata wordt via `formulas.py` "
+        "verwerkt en centraal opgeslagen in `st.session_state.processed_plant_data`, zodat alle andere tabbladen "
+        "hier direct gebruik van kunnen maken."
     )
     st.markdown("---")
 
     if "clients_db" not in st.session_state:
         st.session_state.clients_db = load_clients_db()
 
-    # Bereken statistieken en predictieve datanauwkeurigheid automatisch uit de database
+    # 📥 Externe Data Import Sectie
+    st.markdown("### 📥 Externe Meetdata Importeren (CSV / Excel)")
+    uploaded_file = st.file_uploader(
+        "Upload een CSV- of Excel-bestand met operationele meetdata, lab-analyses of sensorlogs",
+        type=["csv", "xlsx"],
+        key="global_plant_data_uploader"
+    )
+
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                df_imported = pd.read_csv(uploaded_file)
+            else:
+                df_imported = pd.read_excel(uploaded_file)
+            
+            processed_result = process_imported_plant_data(df_imported)
+            st.session_state.processed_plant_data = processed_result
+            
+            st.success(f"✅ Bestand '{uploaded_file.name}' succesvol ingelezen en gestandaardiseerd ({processed_result['total_rows']} rijen).")
+        except Exception as e:
+            st.error(f"Fout bij het inlezen en verwerken van het bestand: {e}")
+
+    has_external_data = "processed_plant_data" in st.session_state and st.session_state.processed_plant_data.get("status") == "success"
+
+    # Bereken statistieken en predictieve datanauwkeurigheid uit de configuratie
     total_installations = 0
     total_fields = 0
     valid_fields = 0
@@ -41,16 +67,26 @@ def render():
                 if val is not None and not pd.isna(val) and val > 0:
                     valid_fields += 1
 
-    data_accuracy = (valid_fields / total_fields * 100) if total_fields > 0 else 100.0
+    base_accuracy = (valid_fields / total_fields * 100) if total_fields > 0 else 100.0
 
-    # 📊 KPI Kaartjes met Predictieve Data Nauwkeurigheid & H2S Norm
+    st.markdown("---")
+
+    # 📊 KPI Kaartjes
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric(label="📊 Actieve Installaties", value=total_installations, help="Totaal aantal geregistreerde installaties in de portefeuille")
     with col2:
-        st.metric(label="🎯 Predictieve Data Nauwkeurigheid", value=f"{data_accuracy:.1f}%", help="Datakwaliteit en volledigheid voor kinetische en economische simulaties")
+        accuracy_display = f"{base_accuracy:.1f}%" + (" (+ Externe Data Verwerkt)" if has_external_data else "")
+        st.metric(label="🎯 Predictieve Data Nauwkeurigheid", value=accuracy_display, help="Datakwaliteit gebaseerd op configuratie en gekoppelde meetsets")
     with col3:
         st.metric(label="⚠️ H₂S Bovengrens Norm", value="< 100 ppm", help="Strenge operationele veiligheidsgrens voor ruw biogas / desulfurisatie")
+
+    if has_external_data:
+        data_summary = st.session_state.processed_plant_data
+        with st.expander("🔍 Preview Verwerkte Externe Meetdata (Gedeeld met andere tabs)", expanded=False):
+            st.dataframe(data_summary["raw_data"].head(10), use_container_width=True)
+            if "avg_h2s" in data_summary:
+                st.info(f"💡 Gedetecteerde gemiddelde H₂S in upload: **{data_summary['avg_h2s']:.1f} ppm**. Andere tabs kunnen dit direct uitlezen.")
 
     st.markdown("---")
     st.markdown("### 📋 Gedetailleerd Portefeuilleoverzicht per Klant")
