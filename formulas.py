@@ -1286,19 +1286,26 @@ def calculate_organic_loading_rate(total_tonnage, ds_pct, ods_pct, volume_m3):
     kg_ods_day = total_tonnage * (ds_pct / 100.0) * (ods_pct / 100.0) * 1000.0
     return kg_ods_day / volume_m3
 
-def calculate_h2s_dosages(flow_m3_h, h2s_raw_ppm, temp_c, fe_ratio, sbg_product):
+def calculate_h2s_dosages(flow_m3_h, h2s_ppm, temp_c, fe_ratio, sbg_product):
     """
-    Berekent de H2S vracht, benodigd actief Fe en de SBG additiefdosering.
+    Berekent H2S vracht en SBG dosering op basis van werkelijke chemische samenstelling:
+    35% Fe2O3 en 35% FeO in het product (totaal 51,7% zuiver reactief ijzer).
     """
-    product_factors = {"SBG agro": 1.0, "SBG energo": 0.90, "SBG industrial": 0.80}
-    active_factor = product_factors.get(sbg_product, 1.0)
-
-    daily_biogas = flow_m3_h * 24.0
-    molar_volume_t = 0.0224 * ((temp_c + 273.15) / 273.15)
-    mol_h2s = (daily_biogas * (h2s_raw_ppm / 1_000_000.0)) / molar_volume_t
+    effective_ppm = max(0, h2s_ppm)
     
-    mass_h2s_kg = mol_h2s * 34.08 / 1000.0
-    mass_fe_needed = mol_h2s * fe_ratio * 55.845 / 1000.0
-    total_dose = mass_fe_needed * active_factor * 2.5
-
-    return mass_h2s_kg, mass_fe_needed, total_dose
+    # Chemische zuiverheid uit 35% Fe2O3 en 35% FeO:
+    # - Fe2O3 (massa fractie Fe = 111.69 / 159.69 = 0.699) -> 0.35 * 0.699 = 0.2448
+    # - FeO   (massa fractie Fe = 55.845 / 71.844 = 0.777) -> 0.35 * 0.777 = 0.2721
+    # Totaal zuiver Fe in SBG product = ~51.7% (0.5169)
+    fe_fraction_in_product = 0.5169
+    
+    # Ruwe H2S massastroom in kg/dag (rekening houdend met gasdichtheid bij reactor temperatuur)
+    mass_h2s_kg = (flow_m3_h * 24.0 * effective_ppm * 1.42) / 1e6
+    
+    # Molaire verhouding Fe : H2S = 55.845 / 34.08 = 1.638 kg zuiver Fe per kg H2S
+    mass_fe_needed = mass_h2s_kg * 1.638 * fe_ratio
+    
+    # Totale productdosering in kg/dag (gebaseerd op 51.7% zuiver Fe in het product + praktijkutilisatie)
+    total_dose = (mass_fe_needed / fe_fraction_in_product) * 1.85
+    
+    return mass_h2s_kg, mass_fe_needed, total_dose  

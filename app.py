@@ -105,6 +105,11 @@ def main():
         mapping_options[label] = i
 
     st.sidebar.title("🧭 Navigatie")
+    
+    # Zorg dat de sidebar radio widget de staat bewaart en de geselecteerde tab behoudt
+    if "sidebar_tab_navigation" not in st.session_state:
+        st.session_state.sidebar_tab_navigation = menu_options[1]  # Standaard op Tab 2 (index 1) of behouden
+
     selected_label = st.sidebar.radio("Ga naar Tabblad", menu_options, key="sidebar_tab_navigation")
 
     st.sidebar.markdown("---")

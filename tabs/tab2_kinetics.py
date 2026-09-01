@@ -81,7 +81,6 @@ def render():
     if not available_substrates:
         available_substrates = df_subs_lib[sub_col].dropna().unique().tolist()
 
-    # Zorg dat Recirculaat / Digestaat altijd als optie beschikbaar is in de keuzelijst
     recirc_label = "Recirculaat / Digestaat"
     if not any("recirculaat" in str(s).lower() or "digestaat" in str(s).lower() for s in available_substrates):
         available_substrates.append(recirc_label)
@@ -166,6 +165,13 @@ def render():
 
     st.markdown("---")
 
+    # Standaard H2S parameters ophalen uit meta of defaults
+    default_h2s = meta.get("h2s_raw", 2500)
+    default_h2s_target = meta.get("h2s_target", 150)
+    default_sbg = meta.get("sbg_product", "SBG agro")
+    default_fe = meta.get("fe_ratio", 1.2)
+    default_bag_weight = meta.get("bag_weight_kg", 20.0)
+
     tab_theorie, tab_operationeel = st.tabs(["🔬 Theorie & Kinetica", "📋 Operationeel & 9-Daagse Planning"])
 
     with tab_theorie:
@@ -177,18 +183,14 @@ def render():
         
         with st.expander("📖 Productspecificaties & Werking H₂S Reductie", expanded=False):
             st.markdown(
-                "* **Waterstofsulfide ($H_2S$)** ontstaat door biologische afbraak van eiwitten en moet onder de **100 ppm** norm blijven ter bescherming van de WKK."
+                "* **Waterstofsulfide ($H_2S$)** ontstaat door biologische afbraak van eiwitten en moet onder de norm blijven ter bescherming van de WKK."
                 "\n* **SBG Productlijnen:**"
                 "\n  * **SBG agro**: Geoptimaliseerd voor reguliere agrarische co-vergisting met een stabiele basismest- en maïsmatrix."
                 "\n  * **SBG energo**: Speciaal ontwikkeld voor energie-intensieve flex-installaties met hoge organische belastingen."
                 "\n  * **SBG industrial**: Zware industriële formulering voor co-productenstromen met hoge zwavelvrachten."
             )
 
-        default_h2s = meta.get("h2s_raw", 2500)
-        default_sbg = meta.get("sbg_product", "SBG agro")
-        default_fe = meta.get("fe_ratio", 1.2)
-
-        col_k1, col_k2, col_k3, col_k4 = st.columns(4)
+        col_k1, col_k2, col_k3, col_k4, col_k5 = st.columns(5)
         with col_k1: 
             sbg_product = st.selectbox(
                 "Selecteer SBG Product", 
@@ -199,38 +201,54 @@ def render():
         with col_k2: 
             h2s_raw = st.number_input(
                 "Ruw Biogas H₂S (ppm)", 
-                min_value=100, max_value=10000, 
+                min_value=0, max_value=10000, 
                 value=int(default_h2s), 
-                step=100, 
+                step=50, 
                 key=f"tab2_h2s_raw_{selected_inst_name}"
             )
         with col_k3: 
             h2s_target = st.number_input(
                 "Doel H₂S (ppm)", 
-                min_value=10, max_value=500, 
-                value=80, 
+                min_value=0, max_value=1000, 
+                value=int(default_h2s_target), 
                 step=10, 
                 key=f"tab2_h2s_target_{selected_inst_name}"
             )
         with col_k4: 
             fe_ratio = st.number_input(
                 "Molaire Fe:S Verhouding", 
-                min_value=1.0, max_value=3.0, 
+                min_value=0.5, max_value=3.0, 
                 value=float(default_fe), 
                 step=0.05, 
                 key=f"tab2_fe_ratio_{selected_inst_name}"
             )
+        with col_k5:
+            bag_weight_kg = st.number_input(
+                "Gewicht per zak SBG (kg)",
+                min_value=5.0, max_value=1000.0,
+                value=float(default_bag_weight),
+                step=5.0,
+                key=f"tab2_bag_weight_{selected_inst_name}"
+            )
 
-        mass_h2s_kg, mass_fe_needed, total_dose = formulas.calculate_h2s_dosages(flow_m3_h, h2s_raw, temp_c, fe_ratio, sbg_product)
+        # Praktisch gekalibreerde berekening op basis van Merlara veldpraktijk:
+        # Bij 500 m3/h en 150 ppm netto reductie = exact 20 kg SBG product (1 zak van 20 kg)
+        effective_h2s_ppm = max(0, h2s_raw - h2s_target)
+        total_dose = (effective_h2s_ppm / 150.0) * (flow_m3_h / 500.0) * fe_ratio * 20.0
+        mass_h2s_kg = (flow_m3_h * 24.0 * effective_h2s_ppm * 1.52) / 1e6
+        mass_fe_needed = total_dose * 0.35
+        bags_per_day = total_dose / bag_weight_kg if bag_weight_kg > 0 else 0.0
+        bags_per_week = bags_per_day * 7
 
-        m1, m2, m3 = st.columns(3)
-        with m1: st.metric(label="📉 H₂S Vracht", value=f"{mass_h2s_kg:.2f} kg/dag")
+        m1, m2, m3, m4 = st.columns(4)
+        with m1: st.metric(label="📉 Netto H₂S Reductievracht", value=f"{mass_h2s_kg:.2f} kg/dag")
         with m2: st.metric(label="🧪 Actief Fe Benodigd", value=f"{mass_fe_needed:.2f} kg/dag")
         with m3: st.metric(label=f"📦 Dosering ({sbg_product})", value=f"{total_dose:.1f} kg/dag")
+        with m4: st.metric(label="🛍️ Aantal Zakken SBG", value=f"{bags_per_day:.2f} zak/dag", delta=f"{bags_per_week:.1f} zak/week")
 
         st.markdown(f"### 📈 Kinetische Reactiecurve: Resterende H₂S vs. Dosering ({sbg_product})")
         dosage_range = np.linspace(0, max(total_dose * 2.0, 10.0), 60)
-        simulated_h2s = h2s_raw * np.exp(-1.6 * (dosage_range / max(total_dose, 1.0)))
+        simulated_h2s = np.maximum(0, h2s_raw - (effective_h2s_ppm * (dosage_range / max(total_dose, 1.0) if total_dose > 0 else 0)))
         
         df_kinetics = pd.DataFrame({
             f"Dosering {sbg_product} (kg/dag)": dosage_range,
@@ -239,11 +257,34 @@ def render():
         st.line_chart(df_kinetics.set_index(f"Dosering {sbg_product} (kg/dag)"))
 
     with tab_operationeel:
-        st.markdown("### 📋 Kantoor & Planning: Substraatspecificatie & 9-Daagse Voedingshorizon")
+        st.markdown("### 📋 Kantoor & Planning: Substraatspecificatie & H₂S / Zakken Systeemkoppeling")
         st.markdown(
-            f"Beheer hier het **substraatrecept** (standaard ingesteld op maïs en recirculaat/digestaat voor agro-installaties zoals Merlara) "
-            f"en bekijk de **9-daagse voedingshorizon** specifiek doorgerekend voor installatie **{plant_name}**."
+            f"Beheer hier het **substraatrecept** (voor installatie **{plant_name}**) en bekijk direct de gekoppelde "
+            f"**H₂S-belasting en benodigde ijzer-/SBG-zakken** als voorbereiding op Tab 3."
         )
+
+        # H2S & Zakken ophalen uit session_state of defaults
+        op_h2s_raw = st.session_state.get(f"tab2_h2s_raw_{selected_inst_name}", default_h2s)
+        op_h2s_target = st.session_state.get(f"tab2_h2s_target_{selected_inst_name}", default_h2s_target)
+        op_sbg_prod = st.session_state.get(f"tab2_sbg_product_{selected_inst_name}", default_sbg)
+        op_fe = st.session_state.get(f"tab2_fe_ratio_{selected_inst_name}", default_fe)
+        op_bag_w = st.session_state.get(f"tab2_bag_weight_{selected_inst_name}", default_bag_weight)
+
+        op_eff_h2s = max(0, op_h2s_raw - op_h2s_target)
+        op_dose = (op_eff_h2s / 150.0) * (flow_m3_h / 500.0) * op_fe * 20.0
+        op_h2s_kg = (flow_m3_h * 24.0 * op_eff_h2s * 1.52) / 1e6
+        op_fe_need = op_dose * 0.35
+        op_bags_day = op_dose / op_bag_w if op_bag_w > 0 else 0.0
+        op_bags_week = op_bags_day * 7
+
+        st.markdown("#### 🧪 H₂S & Additief Status (Directe Systeemkoppeling)")
+        oc1, oc2, oc3, oc4 = st.columns(4)
+        with oc1: st.metric(label="📉 Netto H₂S Reductievracht", value=f"{op_h2s_kg:.2f} kg/dag")
+        with oc2: st.metric(label="🧪 Actief Fe Benodigd", value=f"{op_fe_need:.2f} kg/dag")
+        with oc3: st.metric(label=f"📦 Dosering ({op_sbg_prod})", value=f"{op_dose:.1f} kg/dag")
+        with oc4: st.metric(label="🛍️ Aantal Zakken SBG", value=f"{op_bags_day:.2f} zak/dag", delta=f"{op_bags_week:.1f} zak/week")
+
+        st.markdown("---")
 
         default_sub_val = available_substrates[0] if available_substrates else "Maïskuil (Hoofdsubstraat)"
         recirc_val = next((s for s in available_substrates if 'recircul' in s.lower() or 'digestaat' in s.lower()), recirc_label)
@@ -252,8 +293,8 @@ def render():
         r_ds, r_ods, r_bio = lookup_substrate_props(recirc_val)
 
         default_recipe_data = [
-            {"Substraat": default_sub_val, "Tonnage (ton/dag)": 40.0, "DS (%)": d_ds, "DM / oDS (%)": d_ods, "Biogaspotentieel (m³/ton)": d_bio},
-            {"Substraat": recirc_val, "Tonnage (ton/dag)": 20.0, "DS (%)": r_ds, "DM / oDS (%)": r_ods, "Biogaspotentieel (m³/ton)": r_bio},
+            {"Substraat": default_sub_val, "Tonnage (ton/dag)": 52.0, "DS (%)": d_ds, "DM / oDS (%)": d_ods, "Biogaspotentieel (m³/ton)": d_bio},
+            {"Substraat": recirc_val, "Tonnage (ton/dag)": 150.0, "DS (%)": r_ds, "DM / oDS (%)": r_ods, "Biogaspotentieel (m³/ton)": r_bio},
         ]
 
         stored_recipe = meta.get("recipe", default_recipe_data)
@@ -271,7 +312,7 @@ def render():
             
             ds_val = r.get("DS (%)")
             ods_val = r.get("DM / oDS (%)") if "DM / oDS (%)" in r else r.get("oDS (% oDS)", 90.0)
-            bio_val = r.get("Biogaspotentieel (m³/ton)", 200.0)
+            bio_val = r.get("Biogaspotentieel (m³/ton)")
             
             m_ds, m_ods, m_bio = lookup_substrate_props(sub_val)
             if ds_val is None or pd.isna(ds_val): ds_val = m_ds
@@ -292,6 +333,51 @@ def render():
             df_temp = pd.DataFrame(normalized_stored_recipe)
             st.session_state[recipe_state_key] = df_temp[["Substraat", "Tonnage (ton/dag)", "DS (%)", "DM / oDS (%)", "Biogaspotentieel (m³/ton)"]]
             st.session_state.last_selected_inst = selected_inst_name
+        else:
+            if "Biogaspotentieel (m³/ton)" not in st.session_state[recipe_state_key].columns:
+                biopots = []
+                for sub in st.session_state[recipe_state_key]["Substraat"]:
+                    _, _, b = lookup_substrate_props(sub)
+                    biopots.append(b)
+                st.session_state[recipe_state_key]["Biogaspotentieel (m³/ton)"] = biopots
+
+        # --- AUTO-BALANCER RECIRCULAAT OP DOEL-DM ---
+        st.markdown("#### ⚖️ Automatische DM-Balanshulp (Norm: 8% - 14%)")
+        col_ctrl1, col_ctrl2 = st.columns([2, 2])
+        with col_ctrl1:
+            target_dm = st.slider("Doel Totaal DM (%) voor mengsel", min_value=8.0, max_value=14.0, value=11.0, step=0.5, key=f"target_dm_{selected_inst_name}")
+        with col_ctrl2:
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+            if st.button("🔄 Bereken Recirculaat automatisch op doel-DM", key=f"auto_balance_btn_{selected_inst_name}"):
+                current_df = st.session_state[recipe_state_key].copy()
+                non_recirc = current_df[~current_df["Substraat"].str.lower().str.contains("recirculaat|digestaat", na=False)]
+                recirc_rows = current_df[current_df["Substraat"].str.lower().str.contains("recirculaat|digestaat", na=False)]
+                
+                if not non_recirc.empty:
+                    other_tonnage = non_recirc["Tonnage (ton/dag)"].sum()
+                    weighted_other_ds = (non_recirc["Tonnage (ton/dag)"] * non_recirc["DS (%)"]).sum() / other_tonnage if other_tonnage > 0 else 35.0
+                    recirc_ds = 5.0
+                    if not recirc_rows.empty:
+                        recirc_ds = recirc_rows.iloc[0]["DS (%)"]
+                    
+                    if target_dm > recirc_ds and weighted_other_ds > target_dm:
+                        needed_recirc = other_tonnage * (weighted_other_ds - target_dm) / (target_dm - recirc_ds)
+                        
+                        if not recirc_rows.empty:
+                            current_df.loc[current_df["Substraat"].str.lower().str.contains("recirculaat|digestaat", na=False), "Tonnage (ton/dag)"] = round(needed_recirc, 1)
+                        else:
+                            new_row = pd.DataFrame([{
+                                "Substraat": recirc_val,
+                                "Tonnage (ton/dag)": round(needed_recirc, 1),
+                                "DS (%)": r_ds,
+                                "DM / oDS (%)": r_ods,
+                                "Biogaspotentieel (m³/ton)": r_bio
+                            }])
+                            current_df = pd.concat([current_df, new_row], ignore_index=True)
+                        
+                        st.session_state[recipe_state_key] = current_df
+                        st.success(f"✅ Recirculaat automatisch ingesteld op **{needed_recirc:.1f} ton/dag** om exact **{target_dm}% DM** te bereiken!")
+                        st.rerun()
 
         st.markdown(f"#### 🛠️ 1. Substraatrecept Beheren voor: *{selected_inst_name}*")
         
@@ -302,15 +388,14 @@ def render():
             num_rows="dynamic",
             hide_index=True,
             column_config={
-                "Substraat": st.column_config.SelectboxColumn("Substraat Omschrijving", options=available_substrates, required=True, width="large"),
+                "Substraat": st.column_config.SelectboxColumn("Substraat Omschrijving", options=available_substrates, required=True, width="medium"),
                 "Tonnage (ton/dag)": st.column_config.NumberColumn("Tonnage (ton/dag)", format="%.1f ton", min_value=0.0, step=1.0, width="small"),
                 "DS (%)": st.column_config.NumberColumn("DS (%)", format="%.1f%%", step=0.5, width="small"),
                 "DM / oDS (%)": st.column_config.NumberColumn("DM / oDS (%)", format="%.1f%%", step=0.5, width="small"),
-                "Biogaspotentieel (m³/ton)": None
+                "Biogaspotentieel (m³/ton)": st.column_config.NumberColumn("Biogaspotentieel (m³/ton)", format="%.1f m³/t", step=10.0, min_value=0.0, width="small")
             }
         )
 
-        # Direct controleren of er in kolom 1 een ander substraat is gekozen en direct bijwerken
         needs_rerun = False
         current_session_df = st.session_state[recipe_state_key]
         if len(edited_recipe) == len(current_session_df):
@@ -331,12 +416,10 @@ def render():
         for idx, row in edited_recipe.iterrows():
             sub_val = row.get("Substraat")
             if sub_val and sub_val in available_substrates:
-                m_ds, m_ods, m_bio = lookup_substrate_props(sub_val)
-                if "Biogaspotentieel (m³/ton)" not in edited_recipe.columns:
-                    edited_recipe["Biogaspotentieel (m³/ton)"] = 200.0
-                edited_recipe.at[idx, "Biogaspotentieel (m³/ton)"] = m_bio
+                if pd.isna(row.get("Biogaspotentieel (m³/ton)")) or row.get("Biogaspotentieel (m³/ton)") == 0.0 and sub_val != recirc_label:
+                    _, _, m_bio = lookup_substrate_props(sub_val)
+                    edited_recipe.at[idx, "Biogaspotentieel (m³/ton)"] = m_bio
 
-        # Tijdelijke kopie maken voor formules.py met de verwachte kolomnaam 'oDS (% oDS)'
         calc_df = edited_recipe.copy()
         if "DM / oDS (%)" in calc_df.columns:
             calc_df["oDS (% oDS)"] = calc_df["DM / oDS (%)"]
@@ -349,23 +432,36 @@ def render():
 
         if st.button("💾 Sla dit recept op voor deze installatie in database", key=f"save_recipe_btn_{selected_inst_name}"):
             meta["recipe"] = edited_recipe[["Substraat", "Tonnage (ton/dag)", "DS (%)", "DM / oDS (%)", "Biogaspotentieel (m³/ton)"]].to_dict(orient="records")
+            meta["sbg_product"] = op_sbg_prod
+            meta["h2s_raw"] = op_h2s_raw
+            meta["h2s_target"] = op_h2s_target
+            meta["fe_ratio"] = op_fe
+            meta["bag_weight_kg"] = op_bag_w
+            meta["sbg_dose_kg_day"] = op_dose
+            meta["sbg_bags_day"] = op_bags_day
+
             if " — " in selected_inst_name:
                 c_name, i_name = selected_inst_name.split(" — ", 1)
                 if c_name in st.session_state.clients_db and "installations" in st.session_state.clients_db[c_name]:
                     if i_name in st.session_state.clients_db[c_name]["installations"]:
                         st.session_state.clients_db[c_name]["installations"][i_name]["recipe"] = meta["recipe"]
+                        st.session_state.clients_db[c_name]["installations"][i_name]["sbg_product"] = op_sbg_prod
+                        st.session_state.clients_db[c_name]["installations"][i_name]["h2s_raw"] = op_h2s_raw
+                        st.session_state.clients_db[c_name]["installations"][i_name]["h2s_target"] = op_h2s_target
+                        st.session_state.clients_db[c_name]["installations"][i_name]["fe_ratio"] = op_fe
+                        st.session_state.clients_db[c_name]["installations"][i_name]["bag_weight_kg"] = op_bag_w
+                        st.session_state.clients_db[c_name]["installations"][i_name]["sbg_bags_day"] = op_bags_day
                         try:
                             with open(DATA_FILE, "w", encoding="utf-8") as f:
                                 json.dump(st.session_state.clients_db, f, indent=4, ensure_ascii=False)
-                            st.success(f"✅ Recept succesvol opgeslagen in database voor **{selected_inst_name}**!")
+                            st.success(f"✅ Recept en H₂S dosering succesvol opgeslagen in database voor **{selected_inst_name}**!")
                         except Exception as e:
                             st.error(f"Fout bij wegschrijven naar database: {e}")
 
-        # --- BALANS & DM TOTAAL CHECK ---
         st.markdown("#### 🧪 Recept Balans & DM Totaal Check")
         col_m1, col_m2, col_m3 = st.columns(3)
         with col_m1: st.metric(label="📊 Totale Biomassa Input", value=f"{total_tonnage_day:.1f} ton/dag")
-        with col_m2: st.metric(label="🌾 Gewogen Totaal DS (DM)", value=f"{avg_ds:.1f}%", delta="Doel: 8 - 14%")
+        with col_m2: st.metric(label="🌾 Gewogen Totaal DS (DM)", value=f"{avg_ds:.1f}%", delta="Norm: 8 - 14%")
         with col_m3: st.metric(label="⚡ Verwacht Biogas uit Recept", value=f"{total_expected_biogas_recipe:,.0f} m³/dag", delta=f"Doel: {target_biogas_flow:,.0f} m³/dag")
 
         if avg_ds < 7.0:
