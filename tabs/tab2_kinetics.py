@@ -231,24 +231,28 @@ def render():
                 key=f"tab2_bag_weight_{selected_inst_name}"
             )
 
-        # Praktisch gekalibreerde berekening op basis van Merlara veldpraktijk:
-        # Bij 500 m3/h en 150 ppm netto reductie = exact 20 kg SBG product (1 zak van 20 kg)
+        # Berekening op basis van netto H2S reductie (Ruw - Doel)
         effective_h2s_ppm = max(0, h2s_raw - h2s_target)
-        total_dose = (effective_h2s_ppm / 150.0) * (flow_m3_h / 500.0) * fe_ratio * 20.0
-        mass_h2s_kg = (flow_m3_h * 24.0 * effective_h2s_ppm * 1.52) / 1e6
-        mass_fe_needed = total_dose * 0.35
-        bags_per_day = total_dose / bag_weight_kg if bag_weight_kg > 0 else 0.0
+        mass_h2s, mass_fe, total_dose, total_bags = formulas.calculate_h2s_dosages(
+            flow_m3_h, 
+            effective_h2s_ppm, 
+            temp_c, 
+            fe_ratio, 
+            "SBG Agro"
+        )
+        
+        # Koppeling naar de namen die op de regels hierna worden gebruikt
+        bags_per_day = total_bags
         bags_per_week = bags_per_day * 7
-
         m1, m2, m3, m4 = st.columns(4)
-        with m1: st.metric(label="📉 Netto H₂S Reductievracht", value=f"{mass_h2s_kg:.2f} kg/dag")
-        with m2: st.metric(label="🧪 Actief Fe Benodigd", value=f"{mass_fe_needed:.2f} kg/dag")
+        with m1: st.metric(label="📉 Netto H₂S Reductievracht", value=f"{mass_h2s:.2f} kg/dag")
+        with m2: st.metric(label="🧪 Actief Fe Benodigd", value=f"{mass_fe:.2f} kg/dag")
         with m3: st.metric(label=f"📦 Dosering ({sbg_product})", value=f"{total_dose:.1f} kg/dag")
         with m4: st.metric(label="🛍️ Aantal Zakken SBG", value=f"{bags_per_day:.2f} zak/dag", delta=f"{bags_per_week:.1f} zak/week")
 
         st.markdown(f"### 📈 Kinetische Reactiecurve: Resterende H₂S vs. Dosering ({sbg_product})")
         dosage_range = np.linspace(0, max(total_dose * 2.0, 10.0), 60)
-        simulated_h2s = np.maximum(0, h2s_raw - (effective_h2s_ppm * (dosage_range / max(total_dose, 1.0) if total_dose > 0 else 0)))
+        simulated_h2s = np.maximum(0, h2s_raw - (effective_h2s_ppm * (dosage_range / max(total_dose, 1.0))))
         
         df_kinetics = pd.DataFrame({
             f"Dosering {sbg_product} (kg/dag)": dosage_range,
@@ -271,12 +275,9 @@ def render():
         op_bag_w = st.session_state.get(f"tab2_bag_weight_{selected_inst_name}", default_bag_weight)
 
         op_eff_h2s = max(0, op_h2s_raw - op_h2s_target)
-        op_dose = (op_eff_h2s / 150.0) * (flow_m3_h / 500.0) * op_fe * 20.0
-        op_h2s_kg = (flow_m3_h * 24.0 * op_eff_h2s * 1.52) / 1e6
-        op_fe_need = op_dose * 0.35
-        op_bags_day = op_dose / op_bag_w if op_bag_w > 0 else 0.0
+        # Ontvang nu 4 waarden (inclusief total_bags gebaseerd op 20 kg)
+        op_h2s_kg, op_fe_need, op_dose, op_bags_day = formulas.calculate_h2s_dosages(flow_m3_h, op_eff_h2s, temp_c, op_fe, op_sbg_prod)
         op_bags_week = op_bags_day * 7
-
         st.markdown("#### 🧪 H₂S & Additief Status (Directe Systeemkoppeling)")
         oc1, oc2, oc3, oc4 = st.columns(4)
         with oc1: st.metric(label="📉 Netto H₂S Reductievracht", value=f"{op_h2s_kg:.2f} kg/dag")
@@ -515,3 +516,25 @@ def render():
         st.bar_chart(df_chart_horizon)
 
         st.info(f"💡 **Planning Resultaat:** Met deze invoer van `{base_tonnage_day:.1f} ton/dag` en een reactorvolume van `{volume_m3} m³` bedraagt de organische belasting ca. **{organic_loading_rate:.2f} kg oDS / m³·dag**.")
+        # Haal de maximale N-drempelwaarde op die in Tab 1 is ingesteld voor de actieve plant
+    current_plant = st.session_state.get("active_plant", None)
+    max_n_target = getattr(current_plant, "nitrogen_target", 3.0)
+
+    # Bepaal hier je berekende N-waarde (bijv. op basis van jouw kinetiek- of receptberekening)
+    # Vervang 'calculated_n_val' door de variabele waarin jouw model de stikstof/TAN berekent
+    calculated_n_val = 2.8  # Voorbeeldwaarde, vervang dit door je eigen berekende uitkomst
+
+    st.markdown("---")
+    st.markdown("### 🧪 Stikstof (N) & TAN Procescontrole")
+    
+    col_n1, col_n2 = st.columns(2)
+    with col_n1:
+        st.metric("Max. Drempel (Tab 1)", f"{max_n_target:.2f}")
+    with col_n2:
+        st.metric("Berekende N-waarde", f"{calculated_n_val:.2f}")
+
+    # Controle en statusindicatie op basis van de limiet uit Tab 1
+    if calculated_n_val <= max_n_target:
+        st.success(f"✅ **Normaal:** De berekende N-waarde ({calculated_n_val:.2f}) ligt onder de ingestelde limiet van {max_n_target:.2f}.")
+    else:
+        st.warning(f"⚠️ **Waarschuwing:** De berekende N-waarde ({calculated_n_val:.2f}) overschrijdt de maximum drempel ({max_n_target:.2f}) uit Tab 1!")

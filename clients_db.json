@@ -10,13 +10,14 @@
                 "vol_secondary": 3500.0,
                 "temp_c": 38.5,
                 "ph_nominal": 7.65,
+                "nitrogen_target": 3.0,
                 "recipe": [
                     {
                         "Substraat": "Maize silage",
-                        "Tonnage (ton/dag)": 60.0,
+                        "Tonnage (ton/dag)": 52.0,
                         "DS (%)": 14.0,
                         "DM / oDS (%)": 90.0,
-                        "Biogaspotentieel (m³/ton)": 200.0
+                        "Biogaspotentieel (m³/ton)": 230.0
                     },
                     {
                         "Substraat": "Recirculaat / Digestaat",

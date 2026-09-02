@@ -61,6 +61,7 @@ def render():
                 flow_m3_h = st.number_input("Ruw Biogas Debiet (m³/h)", min_value=50.0, max_value=5000.0, value=500.0, step=25.0)
                 temp_c = st.number_input("Reactor Temperatuur (°C)", min_value=20.0, max_value=60.0, value=38.5, step=0.5)
                 ph_nominal = st.number_input("Nominale pH", min_value=6.5, max_value=8.5, value=7.65, step=0.01)
+                nitrogen_target = st.number_input("Stikstof Indicator (N)", min_value=0.1, max_value=100.0, value=3.0, step=0.1, key="new_nitrogen_target")
 
             st.markdown("---")
             st.markdown("#### ⚙️ Fermenter-Architectuur (Reactor Configuratie)")
@@ -102,7 +103,8 @@ def render():
                         "vol_primary": vol_primary,
                         "vol_secondary": vol_secondary,
                         "temp_c": temp_c,
-                        "ph_nominal": ph_nominal
+                        "ph_nominal": ph_nominal,
+                        "nitrogen_target": nitrogen_target
                     }
                     st.session_state.clients_db = db
                     if save_db(db):
@@ -140,6 +142,8 @@ def render():
                     flow_m3_h = st.number_input("Ruw Biogas Debiet (m³/h)", min_value=50.0, max_value=5000.0, value=float(meta.get("flow_m3_h", 500.0)), step=25.0)
                     temp_c = st.number_input("Reactor Temperatuur (°C)", min_value=20.0, max_value=60.0, value=float(meta.get("temp_c", 38.5)), step=0.5)
                     ph_nominal = st.number_input("Nominale pH", min_value=6.5, max_value=8.5, value=float(meta.get("ph_nominal", 7.65)), step=0.01)
+                    cur_n_target = float(meta.get("nitrogen_target", 3.0))
+                    nitrogen_target = st.number_input("Stikstof Indicator (N)", min_value=0.1, max_value=100.0, value=cur_n_target, step=0.1, key="edit_nitrogen_target")
 
                 st.markdown("---")
                 st.markdown("#### ⚙️ Fermenter-Architectuur (Reactor Configuratie)")
@@ -204,7 +208,8 @@ def render():
                             "vol_primary": vol_primary,
                             "vol_secondary": vol_secondary,
                             "temp_c": temp_c,
-                            "ph_nominal": ph_nominal
+                            "ph_nominal": ph_nominal,
+                            "nitrogen_target": nitrogen_target
                         }
                         if existing_recipe is not None:
                             updated_meta["recipe"] = existing_recipe
@@ -239,6 +244,7 @@ def render():
                             st.markdown(f"- Totaal Volume: **{i_meta.get('volume_m3', 2500)} m³**")
                             st.markdown(f"- Biogas Debiet: **{i_meta.get('flow_m3_h', 500)} m³/h**")
                             st.markdown(f"- Temp / pH: {i_meta.get('temp_c', 38.5)} °C | pH {i_meta.get('ph_nominal', 7.65)}")
+                            st.markdown(f"- Stikstof Indicator (N): **{i_meta.get('nitrogen_target', 3.0)}**")
                         with col_d3:
                             if st.button("🗑️ Verwijder", key=f"del_inst_{c_name}_{i_name}"):
                                 del db[c_name]["installations"][i_name]

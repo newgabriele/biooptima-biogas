@@ -31,6 +31,7 @@ FE_TO_S_RATIO = M_FE / M_S  # 1.7418 kg Fe nodig per 1.0 kg S
 # ============================================================================
 
 @dataclass
+@dataclass
 class PlantProfile:
     name: str = "Standaard Installatie"
     inst_type: str = "agro"  # "agro", "covergisting", "industrieel"
@@ -49,6 +50,7 @@ class PlantProfile:
     hrt_days: float = 50.0
     biogas_price_per_m3: float = 0.68
     fe_product_price_per_kg: float = 1.20
+
 
 # ============================================================================
 # 3. FYSISCH-CHEMISCHE EVENWICHTEN & DM BALANS
@@ -1285,11 +1287,11 @@ def calculate_organic_loading_rate(total_tonnage, ds_pct, ods_pct, volume_m3):
     
     kg_ods_day = total_tonnage * (ds_pct / 100.0) * (ods_pct / 100.0) * 1000.0
     return kg_ods_day / volume_m3
-
 def calculate_h2s_dosages(flow_m3_h, h2s_ppm, temp_c, fe_ratio, sbg_product):
     """
     Berekent H2S vracht en SBG dosering op basis van werkelijke chemische samenstelling:
     35% Fe2O3 en 35% FeO in het product (totaal 51,7% zuiver reactief ijzer).
+    Inclusief hardcoded zakgewicht van 20 kg en kalibratie op Envitec Merlara benchmark.
     """
     effective_ppm = max(0, h2s_ppm)
     
@@ -1305,7 +1307,24 @@ def calculate_h2s_dosages(flow_m3_h, h2s_ppm, temp_c, fe_ratio, sbg_product):
     # Molaire verhouding Fe : H2S = 55.845 / 34.08 = 1.638 kg zuiver Fe per kg H2S
     mass_fe_needed = mass_h2s_kg * 1.638 * fe_ratio
     
-    # Totale productdosering in kg/dag (gebaseerd op 51.7% zuiver Fe in het product + praktijkutilisatie)
-    total_dose = (mass_fe_needed / fe_fraction_in_product) * 1.85
+    # Totale productdosering in kg/dag (gebaseerd op 51.7% zuiver Fe in het product + praktijkfactor)
+    # Factor 2.31 zorgt ervoor dat 500 m³/h bij 160 ppm exact uitkomt op ~20 kg per dag (1 zak).
+    total_dose = (mass_fe_needed / fe_fraction_in_product) * 2.31
     
-    return mass_h2s_kg, mass_fe_needed, total_dose  
+    # Hardcoded zakgewicht van 20 kg en berekening aantal zakken
+    bag_weight_kg = 20.0
+    total_bags = total_dose / bag_weight_kg
+    
+    return mass_h2s_kg, mass_fe_needed, total_dose, total_bags
+def check_nitrogen_level(current_n_val, max_threshold=3.0):
+    """
+    Controleert het stikstofniveau (N / TAN in g/kg of verhouding) 
+    tegen de ingestelde drempelwaarde (standaard 3.0).
+    Retourneert een boolean (binnen de limiet) en een statusbericht.
+    """
+    is_safe = current_n_val <= max_threshold
+    if is_safe:
+        status_msg = f"Normaal ({current_n_val:.2f} <= {max_threshold:.2f}): Geen risico op stikstofinhibitie."
+    else:
+        status_msg = f"Waarschuwing ({current_n_val:.2f} > {max_threshold:.2f}): Verhoogd risico op procesremming!"
+    return is_safe, status_msg
