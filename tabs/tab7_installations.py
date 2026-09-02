@@ -29,12 +29,33 @@ def render():
     if "clients_db" not in st.session_state:
         st.session_state.clients_db = load_clients_db()
 
-    # 📥 Externe Data Import Sectie
-    st.markdown("### 📥 Externe Meetdata Importeren (CSV / Excel)")
+    # 🏢 1. Selecteer eerst de installatie voor de upload
+    st.markdown("### 🏢 Installatie Selectie voor Upload")
+    installatie_opties = ["Merlara", "Installatie 2", "Installatie 3"]  # Pas eventueel aan naar jouw installaties
+    gekozen_installatie = st.selectbox(
+        "Selecteer de installatie waarvoor het bestand bestemd is:",
+        options=installatie_opties,
+        key="tab7_installatie_select"
+    )
+
+    # 🔍 2. Controleer of er al data aanwezig is voor deze installatie in het geheugen
+    current_key = f"uploaded_data_{gekozen_installatie.lower()}"
+    if current_key in st.session_state:
+        saved_file_info = st.session_state[current_key]
+        st.success(
+            f"📁 **Actief geladen voor {gekozen_installatie}:** "
+            f"`{saved_file_info['filename']}` "
+            f"({saved_file_info['processed']['total_rows']} rijen beschikbaar in geheugen)."
+        )
+    else:
+        st.info(f"ℹ️ Er is nog geen bestand geladen voor **{gekozen_installatie}**. Upload hieronder een dataset om te beginnen.")
+
+    # 📥 3. Externe Data Import Sectie
+    st.markdown(f"### 📥 Externe Meetdata Importeren voor **{gekozen_installatie}** (CSV / Excel)")
     uploaded_file = st.file_uploader(
-        "Upload een CSV- of Excel-bestand met operationele meetdata, lab-analyses of sensorlogs",
-        type=["csv", "xlsx"],
-        key="global_plant_data_uploader"
+        f"Upload een CSV- of Excel-bestand voor {gekozen_installatie}",
+        type=["csv", "xlsx", "xls"],
+        key="tab7_file_uploader"
     )
 
     if uploaded_file is not None:
@@ -45,9 +66,17 @@ def render():
                 df_imported = pd.read_excel(uploaded_file)
             
             processed_result = process_imported_plant_data(df_imported)
-            st.session_state.processed_plant_data = processed_result
             
-            st.success(f"✅ Bestand '{uploaded_file.name}' succesvol ingelezen en gestandaardiseerd ({processed_result['total_rows']} rijen).")
+            # Sla op in zowel de globale processed_plant_data als de installatie-specifieke key
+            st.session_state.processed_plant_data = processed_result
+            st.session_state[current_key] = {
+                "filename": uploaded_file.name,
+                "data": df_imported,
+                "processed": processed_result
+            }
+            
+            st.success(f"✅ Bestand '{uploaded_file.name}' succesvol ingelezen voor **{gekozen_installatie}** en gestandaardiseerd ({processed_result['total_rows']} rijen).")
+            st.rerun()
         except Exception as e:
             st.error(f"Fout bij het inlezen en verwerken van het bestand: {e}")
 
@@ -83,7 +112,7 @@ def render():
 
     if has_external_data:
         data_summary = st.session_state.processed_plant_data
-        with st.expander("🔍 Preview Verwerkte Externe Meetdata (Gedeeld met andere tabs)", expanded=False):
+        with st.expander(f"🔍 Preview Verwerkte Externe Meetdata ({gekozen_installatie})", expanded=False):
             st.dataframe(data_summary["raw_data"].head(10), use_container_width=True)
             if "avg_h2s" in data_summary:
                 st.info(f"💡 Gedetecteerde gemiddelde H₂S in upload: **{data_summary['avg_h2s']:.1f} ppm**. Andere tabs kunnen dit direct uitlezen.")
